@@ -8,19 +8,22 @@ input_midi = MidiFile("../../../EMOPIA_cls-main/empty dataset/00e6d5785a99002bc6
 output_midi = MidiFile()
 # Copy time metrics between both files
 output_midi.ticks_per_beat = input_midi.ticks_per_beat
-output_midi.type = input_midi.type
-# print(input_midi)
 
 for original_track in input_midi.tracks:
     new_track = MidiTrack()
     #print(original_track)
+    note_time = 0
     for msg in original_track:
+
+        note_time += msg.time
+
         if msg.type == 'note_on' or msg.type == 'note_off' or msg.type == 'control_change':
             if msg.channel != 9:
-                new_track.append(msg.copy(channel = 2))
-
+                new_track.append(msg.copy(type=msg.type, time=note_time))
+                note_time = 0
         else:
-            new_track.append(msg)
+            new_track.append(msg.copy(type=msg.type, time=note_time))
+            note_time=0
 
     # MIDI files are multitrack. Here we append
     # the new track with mapped notes to the output file
