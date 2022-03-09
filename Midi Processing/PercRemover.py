@@ -1,7 +1,6 @@
 # from pathlib import Path
 import os.path
 
-import mido
 from mido import MidiFile, MidiTrack
 from argparse import ArgumentParser, Namespace
 
