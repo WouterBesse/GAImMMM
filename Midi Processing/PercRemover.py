@@ -1,44 +1,63 @@
 # from pathlib import Path
+import os.path
+
 import mido
 from mido import MidiFile, MidiTrack
+from argparse import ArgumentParser, Namespace
 
-# Import wanted midi file
-input_midi = MidiFile("../../../EMOPIA_cls-main/empty dataset/00e6d5785a99002bc645765b8851e9ff.mid", clip=True)
-# Create output midi file
-output_midi = MidiFile()
-# Copy time metrics between both files
-output_midi.ticks_per_beat = input_midi.ticks_per_beat
+def evaluate(args):
+    listofmidi = os.listdir(args.input_path)
 
-for original_track in input_midi.tracks:
-    new_track = MidiTrack()
-    #print(original_track)
-    note_time = 0
-    for msg in original_track:
+    for file in listofmidi:
+        full_path = os.path.join(args.input_path, file)
+        if os.path.isfile(full_path):
+            remove_drums(file, args.output_path)
 
-        note_time += msg.time
+def remove_drums(inputpath, outputpath = "./newdataset/"):
+    # Get the name of the file and make a file place for it
+    filename = os.path.basename(inputpath)
+    outputfile = os.path.join(outputpath, filename)
 
-        if msg.type == 'note_on' or msg.type == 'note_off' or msg.type == 'control_change':
-            if msg.channel != 9:
+    # Import wanted midi file
+    input_midi = MidiFile(inputpath, clip=True)
+    # Create output midi file
+    output_midi = MidiFile()
+    # Copy time metrics between both files
+    output_midi.ticks_per_beat = input_midi.ticks_per_beat
+
+    for original_track in input_midi.tracks:
+        new_track = MidiTrack()
+
+        note_time = 0
+        # Iterate through all messages in track
+        for msg in original_track:
+            # Add the time value of the current note
+            # If previous note wasn't channel 9, this will be 0
+            # If it was it will be added to the previous note
+            note_time += msg.time
+
+            # Only notes of this type have channel, so only check it for them
+            if msg.type in ['note_on', 'note_off', 'control_change']:
+                # Only add note if channel is not 9
+                if msg.channel != 9:
+                    new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
+                    # Reset note time
+                    note_time = 0
+            else:
+                # Always add all messages of other types
                 new_track.append(msg.copy(type=msg.type, time=note_time))
-                note_time = 0
-        else:
-            new_track.append(msg.copy(type=msg.type, time=note_time))
-            note_time=0
+                # Reset note time
+                note_time=0
 
-    # MIDI files are multitrack. Here we append
-    # the new track with mapped notes to the output file
-    output_midi.tracks.append(new_track)
+        # MIDI files are multitrack. Here we append
+        # the new track with mapped notes to the output file
+        output_midi.tracks.append(new_track)
 
-print(output_midi)
-output_midi.save('./Murundu-remap.mid')
+    output_midi.save(outputfile)
 
-# def print_hi(name):
-#     # Use a breakpoint in the code line below to debug your script.
-#     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-#
-#
-# # Press the green button in the gutter to run the script.
-# if __name__ == '__main__':
-#     print_hi('PyCharm')
-#
-# # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("--input_path", type=str, required=True)
+    parser.add_argument("--output_path", default="./newdataset/", type=str)
+    args = parser.parse_args()
+    evaluate(args)
