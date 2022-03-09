@@ -11,7 +11,7 @@ def evaluate(args):
     for file in listofmidi:
         full_path = os.path.join(args.input_path, file)
         if os.path.isfile(full_path):
-            remove_drums(file, args.output_path)
+            remove_drums(full_path, args.output_path)
 
 def remove_drums(inputpath, outputpath = "./newdataset/"):
     # Get the name of the file and make a file place for it
