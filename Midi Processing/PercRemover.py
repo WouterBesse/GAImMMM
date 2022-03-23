@@ -1,16 +1,64 @@
 # from pathlib import Path
 import os.path
+import os
+import time
 
 from mido import MidiFile, MidiTrack
 from argparse import ArgumentParser, Namespace
 
-def evaluate(args):
-    listofmidi = os.listdir(args.input_path)
+# clearConsole script acquired from https://www.delftstack.com/howto/python/python-clear-console/
+def clearConsole():
+    command = 'clear'
+    if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
+        command = 'cls'
+    os.system(command)
 
-    for file in listofmidi:
+clearConsole()
+
+# getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
+def getListOfFiles(dirName):
+    # create a list of file and sub directories
+    # names in the given directory
+    listOfFile = os.listdir(dirName)
+    allFiles = list()
+    # Iterate over all the entries
+    for entry in listOfFile:
+        # Create full path
+        fullPath = os.path.join(dirName, entry)
+        # If entry is a directory then get the list of files in this directory
+        if os.path.isdir(fullPath):
+            allFiles = allFiles + getListOfFiles(fullPath)
+        else:
+            allFiles.append(fullPath)
+
+    return allFiles
+
+def evaluate(args):
+    # counting variable
+    succeeded = 0
+    failed = 0
+
+    listOfFiles = getListOfFiles(args.input_path)
+    # Quick information on what you are doing
+    clearConsole()
+    print("Amount of files to process =", len(listOfFiles))
+    time.sleep(5)
+
+    for file in listOfFiles:
+        # Display, nice to see what's happening
+        clearConsole()
+        print("Files succeeded =", succeeded)
+        print("Files failed =", failed)
+        print("Current file =", file)
+
         full_path = os.path.join(args.input_path, file)
         if os.path.isfile(full_path):
-            remove_drums(full_path, args.output_path)
+            try:
+                remove_drums(full_path, args.output_path)
+                succeeded += 1
+            except Exception:
+                failed += 1
+                pass
 
 def remove_drums(inputpath, outputpath = "./newdataset/"):
     # Get the name of the file and make a file place for it
