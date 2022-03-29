@@ -58,8 +58,8 @@ def magenta_extractor(midi_path):
 
 def predict(args, filepath) -> None:
     device = args.cuda if args.cuda and torch.cuda.is_available() else 'cpu'
-    if args.cuda:
-        print('GPU name: ', torch.cuda.get_device_name(device=args.cuda))
+    # if args.cuda:
+    #     print('GPU name: ', torch.cuda.get_device_name(device=args.cuda))
     config_path = Path("best_weight", args.types, args.task, "hparams.yaml")
     checkpoint_path = Path("best_weight", args.types, args.task, "best.ckpt")
     config = OmegaConf.load(config_path)
@@ -88,29 +88,36 @@ def predict(args, filepath) -> None:
     
     pred_label = label_list[prediction.squeeze(0).max(0)[1].detach().cpu().numpy()]
     pred_value = prediction.squeeze(0).detach().cpu().numpy()
-    print("========")
     print(filepath, " is emotion", pred_label)
     print("Inference values: ", pred_value)
 
     return pred_value
 
-def batch(args) -> None:
+def batch(args):
+    # Make a list of files
     PredictList = []
     filelist = os.listdir(args.input_path)
+    # Counting variable for the percentage
     i = 0
+    # Go through each file and analyze it
     for file in filelist:
-        clearConsole()
+        # Print information
+        print("========")
+        #clearConsole()
         i += 1
         print("Current file:", file)
         percentage = i / len(filelist)
-        print(percentage,'% done')
+        print(math.ceil(percentage * 100),'% done')
+        # Analyze file and make region calculation
         full_path = os.path.join(args.input_path, file)
         if os.path.isfile(full_path):
             n_cls = predict(args, full_path)
             raw_valence = [n_cls[0] + n_cls[1], n_cls[2] + n_cls[3]]
-            norm_valence = ((raw_valence[0] / max(raw_valence) - raw_valence[1] / max(raw_valence)) + 1) / 2
+            max_valence = max(raw_valence,key=lambda x: abs(x))
+            norm_valence = ((raw_valence[0] / max_valence - raw_valence[1] / max_valence) + 1) / 2
             raw_arousal = [n_cls[1] + n_cls[3], n_cls[0] + n_cls[2]]
-            norm_arousal = ((raw_arousal[0] / max(raw_arousal) - raw_arousal[1] / max(raw_arousal)) + 1) / 2
+            max_arousal = max(raw_arousal, key=lambda x: abs(x))
+            norm_arousal = ((raw_arousal[0] / max_arousal - raw_arousal[1] / max_arousal) + 1) / 2
             norm_coord = ((math.ceil(norm_arousal * 5) - 1) * 5) + math.ceil(norm_valence * 5)
             PredictList.append([file, norm_coord])
     for value in PredictList:
@@ -123,4 +130,4 @@ if __name__ == "__main__":
     parser.add_argument("--input_path", required=True, type=str)
     parser.add_argument('--cuda', default='cuda:0', type=str)
     args = parser.parse_args()
-    _, _ = batch(args)
+    batch(args)
