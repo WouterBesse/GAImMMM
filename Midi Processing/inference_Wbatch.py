@@ -56,12 +56,12 @@ def remi_extractor(midi_path, event_to_int):
 def magenta_extractor(midi_path):
     return encode_midi(midi_path)
 
-def predict(args, filepath) -> None:
+def predict(args, filepath, task) -> None:
     device = args.cuda if args.cuda and torch.cuda.is_available() else 'cpu'
     # if args.cuda:
     #     print('GPU name: ', torch.cuda.get_device_name(device=args.cuda))
-    config_path = Path("best_weight", args.types, args.task, "hparams.yaml")
-    checkpoint_path = Path("best_weight", args.types, args.task, "best.ckpt")
+    config_path = Path("best_weight", args.types, task, "hparams.yaml")
+    checkpoint_path = Path("best_weight", args.types, task, "best.ckpt")
     config = OmegaConf.load(config_path)
     label_list = list(config.task.labels)
     model = SAN(
@@ -88,8 +88,8 @@ def predict(args, filepath) -> None:
     
     pred_label = label_list[prediction.squeeze(0).max(0)[1].detach().cpu().numpy()]
     pred_value = prediction.squeeze(0).detach().cpu().numpy()
-    print(filepath, " is emotion", pred_label)
-    print("Inference values: ", pred_value)
+    #print(filepath, " is emotion", pred_label)
+    #print("Inference values: ", pred_value)
 
     return pred_value
 
@@ -97,31 +97,58 @@ def batch(args):
     # Make a list of files
     PredictList = []
     filelist = os.listdir(args.input_path)
+    print("Starting batch analysis")
     # Counting variable for the percentage
-    i = 0
+    z = 0
+    furthestval = 0
+    furthestar = 0
+    vallist = []
+    arlist = []
     # Go through each file and analyze it
     for file in filelist:
         # Print information
-        print("========")
-        #clearConsole()
-        i += 1
-        print("Current file:", file)
-        percentage = i / len(filelist)
-        print(math.ceil(percentage * 100),'% done')
+        z += 1
+        percentage = z / len(filelist)
         # Analyze file and make region calculation
         full_path = os.path.join(args.input_path, file)
+        # n_cls = [2.74, 1.33, -5.33, -1.1]
         if os.path.isfile(full_path):
-            n_cls = predict(args, full_path)
-            raw_valence = [n_cls[0] + n_cls[1], n_cls[2] + n_cls[3]]
-            max_valence = max(raw_valence,key=lambda x: abs(x))
-            norm_valence = ((raw_valence[0] / max_valence - raw_valence[1] / max_valence) + 1) / 2
-            raw_arousal = [n_cls[1] + n_cls[3], n_cls[0] + n_cls[2]]
-            max_arousal = max(raw_arousal, key=lambda x: abs(x))
-            norm_arousal = ((raw_arousal[0] / max_arousal - raw_arousal[1] / max_arousal) + 1) / 2
-            norm_coord = ((math.ceil(norm_arousal * 5) - 1) * 5) + math.ceil(norm_valence * 5)
-            PredictList.append([file, norm_coord])
-    for value in PredictList:
-        print(value)
+            raw_val = predict(args, full_path, "valence")
+            raw_ar = predict(args, full_path, "arousal")
+            clearConsole()
+            print(math.ceil(percentage * 100), '% progress')
+            print("Current file:", file)
+            print("valence = ", raw_val)
+            print("arousal = ", raw_ar)
+            for i in range(2):
+                if abs(raw_val[i]) > furthestval:
+                    furthestval = abs(raw_val[i])
+                if abs(raw_ar[i]) > furthestar:
+                    furthestar = abs(raw_ar[i])
+            vallist.append(raw_val)
+            arlist.append(raw_ar)
+            # max_valence = abs(max(raw_valence,key=lambda x: abs(x)))
+            # max_arousal = max(raw_arousal, key=lambda x: abs(x))
+            # PredictList.append([file, norm_coord])
+    normvallist = []
+    normarlist = []
+    for entry in vallist:
+        normentry = []
+        for value in entry:
+            normentry.append(value / furthestval)
+        normvallist.append(normentry)
+    for entry in arlist:
+        normentry = []
+        for value in entry:
+            normentry.append(value / furthestar)
+        normarlist.append(normentry)
+    print("Valence list: ")
+    for valence in normvallist:
+        print(valence)
+    print("Arousal list: ")
+    for arousal in normarlist:
+        print(arousal)
+    print("Done :)")
 
 if __name__ == "__main__":
     parser = ArgumentParser()
