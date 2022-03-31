@@ -5,6 +5,10 @@ import time
 
 from mido import MidiFile, MidiTrack
 from argparse import ArgumentParser, Namespace
+import multiprocessing as mp
+
+succeeded = 0
+failed = 0
 
 # clearConsole script acquired from https://www.delftstack.com/howto/python/python-clear-console/
 def clearConsole():
@@ -35,32 +39,43 @@ def getListOfFiles(dirName):
 
 def evaluate(args):
     # counting variable
-    succeeded = 0
-    failed = 0
+    
 
+    print("Getting list of files :)")
     listOfFiles = getListOfFiles(args.input_path)
     # Quick information on what you are doing
     clearConsole()
     print("Amount of files to process =", len(listOfFiles))
     time.sleep(5)
 
-    for file in listOfFiles:
-        # Display, nice to see what's happening
-        clearConsole()
-        print("Files succeeded =", succeeded)
-        print("Files failed =", failed)
-        print("Current file =", file)
+    pool = mp.Pool(mp.cup_count())
 
-        full_path = os.path.join(args.input_path, file)
-        if os.path.isfile(full_path):
-            try:
-                remove_drums(full_path, args.output_path)
-                succeeded += 1
-            except Exception:
-                failed += 1
-                pass
+    pool.starmap(tryremove, [(args.input_patch, file, args.outputpath) for file in listOfFiles])
 
-def remove_drums(inputpath, outputpath = "./newdataset/"):
+    pool.close
+
+    print("Done <3")
+
+    # for file in listOfFiles:
+        
+
+def tryremove(inputpath, filename, outputpath = "./newdataset/"):
+    # Display, nice to see what's happening
+    clearConsole()
+    print("Files succeeded =", succeeded)
+    print("Files failed =", failed)
+    print("Current file =", filename)
+
+    full_path = os.path.join(inputpath, filename)
+    if os.path.isfile(full_path):
+        try:
+            remove_drums(full_path, outputpath)
+            succeeded += 1
+        except Exception:
+            failed += 1
+            pass
+
+def remove_drums(inputpath, outputpath):
     # Get the name of the file and make a file place for it
     filename = os.path.basename(inputpath)
     outputfile = os.path.join(outputpath, filename)
@@ -86,7 +101,7 @@ def remove_drums(inputpath, outputpath = "./newdataset/"):
             # Only notes of this type have channel, so only check it for them
             if msg.type in ['note_on', 'note_off', 'control_change']:
                 # Only add note if channel is not 9
-                if msg.channel != 9:
+                if msg.channel < 9:
                     new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
                     # Reset note time
                     note_time = 0
