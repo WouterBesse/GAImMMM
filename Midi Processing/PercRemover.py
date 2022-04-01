@@ -17,7 +17,7 @@ def clearConsole():
         command = 'cls'
     os.system(command)
 
-clearConsole()
+#clearConsole()
 
 # getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
 def getListOfFiles(dirName):
@@ -39,41 +39,108 @@ def getListOfFiles(dirName):
 
 def evaluate(args):
     # counting variable
-    
+    global succeeded
+    global failed
 
+    
     print("Getting list of files :)")
     listOfFiles = getListOfFiles(args.input_path)
+
     # Quick information on what you are doing
     clearConsole()
     print("Amount of files to process =", len(listOfFiles))
-    time.sleep(5)
 
-    pool = mp.Pool(mp.cup_count())
-
-    pool.starmap(tryremove, [(args.input_patch, file, args.outputpath) for file in listOfFiles])
-
-    pool.close
+    resultaten = []
+    t = 0
+    tt = 0
+    ttt = 0
+    for file in listOfFiles:
+        ts = time.time()
+        print("Current file =", file)
+        print("Files succeeded =", succeeded)
+        print("Files failed =", failed)
+        result = tryremove(args.input_path, file, args.output_path)
+        succeeded += result[0]
+        failed += result[1]
+        resultaten.append(result)
+        clearConsole()
+        tt += time.time()-ts
+        if t == 15:
+            t = 0
+            ttt = tt
+            tt = 0
+        t += 1
+        print("Time in serial for ", t + 1,":", ttt)
 
     print("Done <3")
 
-    # for file in listOfFiles:
-        
+def evaluate_par(args):
+    # counting variable
+    global succeeded
+    global failed
 
-def tryremove(inputpath, filename, outputpath = "./newdataset/"):
-    # Display, nice to see what's happening
+    
+    print("Getting list of files :)")
+    print("CPU count", mp.cpu_count())
+    listOfFiles = getListOfFiles(args.input_path)
+
+    # Quick information on what you are doing
     clearConsole()
-    print("Files succeeded =", succeeded)
-    print("Files failed =", failed)
-    print("Current file =", filename)
+    print("Amount of files to process =", len(listOfFiles))
+
+    pool = mp.Pool(mp.cpu_count())
+
+    succeeded = 123
+    
+    global c
+    c = 0
+    resultaten = []
+    tt = 0
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path) for file in listOfFiles]).get()
+    print("appelflap")
+    # while c < len(listOfFiles):
+    #     ts = time.time()
+    #     n = 0
+    #     result = []
+        
+    #     print("Current file =", listOfFiles[c])
+    #     print("Files succeeded =", succeeded)
+    #     print("Files failed =", failed)
+        
+    #     n += 1
+    #     c += 1
+    #     succeeded += result[0]
+    #     failed += result[1]
+    #     resultaten.append(result)
+    #     clearConsole()
+    #     print("Time in parallel for 16: ", tt)
+    #     tt = time.time()-ts
+    pool.close
+    pool.join
+    print("Done <3")
+
+    # for file in listOfFiles:
+# inputpath, filename, outputpath = "./newdataset/"
+def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/"):
+    st = time.time()
+    
+    
+    fail = 0
+    filetosave = []
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
+        remove_drums(full_path, outputpath)
         try:
             remove_drums(full_path, outputpath)
-            succeeded += 1
+            # print("Succeeded")
         except Exception:
-            failed += 1
+            print("Failed :(")
             pass
+    clearConsole()
+    print("Taken time: ", time.time() - st)
+    # print("Files done :", succeeded)
+    return (fail, succeed)
 
 def remove_drums(inputpath, outputpath):
     # Get the name of the file and make a file place for it
@@ -101,7 +168,7 @@ def remove_drums(inputpath, outputpath):
             # Only notes of this type have channel, so only check it for them
             if msg.type in ['note_on', 'note_off', 'control_change']:
                 # Only add note if channel is not 9
-                if msg.channel < 9:
+                if msg.channel < 128:
                     new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
                     # Reset note time
                     note_time = 0
@@ -116,10 +183,15 @@ def remove_drums(inputpath, outputpath):
         output_midi.tracks.append(new_track)
 
     output_midi.save(outputfile)
+    return [output_midi, outputfile]
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", default="./newdataset/", type=str)
+    parser.add_argument("--parallel", default=1, type=int)
     args = parser.parse_args()
-    evaluate(args)
+    if args.parallel == 0:
+        evaluate(args)
+    else:
+        evaluate_par(args)
