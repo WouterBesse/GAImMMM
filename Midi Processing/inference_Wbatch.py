@@ -9,7 +9,6 @@ from scipy import stats
 import pandas as pd
 
 import torch
-import torchaudio
 from omegaconf import DictConfig, OmegaConf
 # from audio_cls.src.model.net import ShortChunkCNN_Res
 from midi_cls.src.model.net import SAN
@@ -28,14 +27,23 @@ def clearConsole():
         command = 'cls'
     os.system(command)
 
-def torch_sox_effect_load(mp3_path, resample_rate):
-    effects = [
-        ['rate', str(resample_rate)]
-    ]
-    waveform, source_sr = torchaudio.load(mp3_path)
-    if source_sr != 22050:
-        waveform, _ = torchaudio.sox_effects.apply_effects_tensor(waveform, source_sr, effects, channels_first=True)
-    return waveform
+# getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
+def getListOfFiles(dirName):
+    # create a list of file and sub directories
+    # names in the given directory
+    listOfFile = os.listdir(dirName)
+    allFiles = list()
+    # Iterate over all the entries
+    for entry in listOfFile:
+        # Create full path
+        fullPath = os.path.join(dirName, entry)
+        # If entry is a directory then get the list of files in this directory
+        if os.path.isdir(fullPath):
+            allFiles = allFiles + getListOfFiles(fullPath)
+        else:
+            allFiles.append(fullPath)
+
+    return allFiles
 
 def remi_extractor(midi_path, event_to_int):
     midi_obj = analyzer(midi_path)
@@ -98,7 +106,7 @@ def predict(args, filepath, task) -> None:
 
 def batch(args):
     # Make a list of files
-    filelist = os.listdir(args.input_path)
+    filelist = getListOfFiles(args.input_path)
     print("Starting batch analysis")
     # Counting variable for the percentage
     z = 0
@@ -109,6 +117,8 @@ def batch(args):
     namelist = []
     # Go through each file and analyze it
     for file in filelist:
+        
+        
         # Counter to keep track of percentage done
         z += 1
         percentage = z / len(filelist)
@@ -116,25 +126,33 @@ def batch(args):
         full_path = os.path.join(args.input_path, file)
         # n_cls = [2.74, 1.33, -5.33, -1.1]
         if os.path.isfile(full_path):
-            namelist.append(file)
-            # Predict valence and arousal
-            raw_val = predict(args, full_path, "valence")
-            raw_ar = predict(args, full_path, "arousal")
-            # Print information
-            clearConsole()
-            print(math.ceil(percentage * 100), '% progress')
-            print("Current file:", file)
-            print("valence = ", raw_val)
-            print("arousal = ", raw_ar)
-            # Add to total list
-            valraw.append(abs(raw_val[0]))
-            valraw.append(abs(raw_val[1]))
-            arraw.append(abs(raw_ar[0]))
-            arraw.append(abs(raw_ar[1]))
-            vallist.append(raw_val)
-            arlist.append(raw_ar)
-            # max_valence = abs(max(raw_valence,key=lambda x: abs(x)))
-            # max_arousal = max(raw_arousal, key=lambda x: abs(x))
+            try:
+                # Predict valence and arousal
+                raw_val = predict(args, full_path, "valence")
+                raw_ar = predict(args, full_path, "arousal")
+                # Print information
+                clearConsole()
+                print(math.ceil(percentage * 100), '% progress')
+                print("Current file:", file)
+                print("valence = ", raw_val)
+                print("arousal = ", raw_ar)
+                # Add to total list
+                namelist.append(file)
+                valraw.append(abs(raw_val[0]))
+                valraw.append(abs(raw_val[1]))
+                arraw.append(abs(raw_ar[0]))
+                arraw.append(abs(raw_ar[1]))
+                vallist.append(raw_val)
+                arlist.append(raw_ar)
+                # max_valence = abs(max(raw_valence,key=lambda x: abs(x)))
+                # max_arousal = max(raw_arousal, key=lambda x: abs(x))
+            except Exception:
+                clearConsole()
+                print(math.ceil(percentage * 100), '% progress')
+                print("Current file:", file)
+                print("valence = failed")
+                print("arousal = failed")
+                pass
     
     # Define normalised lists and vector lists
     normvallist = []
@@ -166,11 +184,13 @@ def batch(args):
 
     # Remove outliers and find highest value for normalisation
     i = 0
+    zthresh = 1.9
     for arzed, valzed in zip(arzcoupled, valzcoupled):
-        if valzed[0] >= 2.9 or valzed[1] >= 2.9 or arzed[0] >= 2.9 or arzed[1] >= 2.9:
+        if valzed[0] >= zthresh or valzed[1] >= zthresh or arzed[0] >= zthresh or arzed[1] >= zthresh or valzed[0] <= -zthresh or valzed[1] <= -zthresh or arzed[0] <= -zthresh or arzed[1] <= -zthresh:
             del vallist[i]
             del arlist[i]
             del namelist[i]
+            print("removed one")
             i -= 1
         else:
             if vallist[i][0] > furthestval:
@@ -182,6 +202,8 @@ def batch(args):
             elif arlist[i][1] > furthestar:
                 furthestar = arlist[i][1]
         i += 1
+    print("Furthest arousal", furthestar)
+    print("Furthes valence", furthestval)
 
     # print("Valence + Z list: ")
     # for zed in arzcoupled:
@@ -219,17 +241,18 @@ def batch(args):
         catlist.append(math.floor(vectar * 5) * 4 + math.floor(vectval * 5))
 
     # Print lists
-    print("Valence list: ")
-    for valence in normvallist:
-        print(valence)
-    print("Arousal list: ")
-    for arousal in normarlist:
-        print(arousal)
-    print("Category list: ")
-    for category in catlist:
-        print(category)
+    # print("Valence list: ")
+    # for valence in normvallist:
+    #     print(valence)
+    # print("Arousal list: ")
+    # for arousal in normarlist:
+    #     print(arousal)
+    # print("Category list: ")
+    # for category in catlist:
+    #     print(category)
 
     print("==============")
+    print("Namelist length:", len(namelist), " - Catlist length:", len(catlist), " - Vectvallist length:", len(vectvallist), " - Vectarlist length:", len(vectarlist))
     outputfile = os.path.join(args.output_path, "analysis.csv")
     print("Saving to csv to: ", outputfile)
     dict = {'Filename': namelist, 'Category': catlist, 'Valence vector': vectvallist, 'Arousal vector': vectarlist}
