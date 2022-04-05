@@ -214,14 +214,14 @@ def batch(args):
     #     print(valence, " -- Z: ", zed)
 
     # Do quartile value analysis
-    valQ1 = np.percentile(valraw, 25, interpolation = 'midpoint')
-    valQ3 = np.percentile(valraw, 75, interpolation = 'midpoint')
+    valQ1 = np.percentile(sorted(valraw), 25)
+    valQ3 = np.percentile(sorted(valraw), 75)
     valIQR = valQ3 - valQ1
     valUpper = valQ3 + (1.5 * valIQR)
     valLower = valQ1 - (1.5 * valIQR)
 
-    arQ1 = np.percentile(arraw, 25, interpolation = 'midpoint')
-    arQ3 = np.percentile(arraw, 75, interpolation = 'midpoint')
+    arQ1 = np.percentile(sorted(arraw), 25)
+    arQ3 = np.percentile(sorted(arraw), 75)
     arIQR = arQ3 - arQ1
     arUpper = arQ3 + (1.5 * arIQR)
     arLower = arQ1 - (1.5 * arIQR)
@@ -297,7 +297,7 @@ def batch(args):
     #     print(category)
 
     print("==============")
-    os.makedirs(args.output_file, exist_ok=True)
+    os.makedirs(args.output_path, exist_ok=True)
     if verbose:
         print("Analysis information:")
         print("Namelist length:", len(filterednames), " - Catlist length:", len(catlist), " - Vectvallist length:", len(vectvallist), " - Vectarlist length:", len(vectarlist))
