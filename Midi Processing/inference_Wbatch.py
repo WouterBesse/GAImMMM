@@ -7,6 +7,7 @@ import math
 # from typing import ClassVar
 from scipy import stats
 import pandas as pd
+import numpy as np
 
 import torch
 from omegaconf import DictConfig, OmegaConf
@@ -115,6 +116,7 @@ def batch(args):
     valraw = []
     arraw = []
     namelist = []
+    verbose = args.verbose
     # Go through each file and analyze it
     for file in filelist:
         
@@ -132,78 +134,73 @@ def batch(args):
                 raw_ar = predict(args, full_path, "arousal")
                 # Print information
                 clearConsole()
-                print(math.ceil(percentage * 100), '% progress')
+                print(round(percentage * 100, 2), '% progress')
                 print("Current file:", file)
                 print("valence = ", raw_val)
                 print("arousal = ", raw_ar)
                 # Add to total list
                 namelist.append(file)
-                valraw.append(abs(raw_val[0]))
-                valraw.append(abs(raw_val[1]))
-                arraw.append(abs(raw_ar[0]))
-                arraw.append(abs(raw_ar[1]))
+                valraw.append(raw_val[0])
+                valraw.append(raw_val[1])
+                arraw.append(raw_ar[0])
+                arraw.append(raw_ar[1])
                 vallist.append(raw_val)
                 arlist.append(raw_ar)
                 # max_valence = abs(max(raw_valence,key=lambda x: abs(x)))
                 # max_arousal = max(raw_arousal, key=lambda x: abs(x))
             except Exception:
                 clearConsole()
-                print(math.ceil(percentage * 100), '% progress')
+                print(round(percentage * 100, 2), '% progress')
                 print("Current file:", file)
                 print("valence = failed")
                 print("arousal = failed")
                 pass
     
     # Define normalised lists and vector lists
-    normvallist = []
-    normarlist = []
-    vectarlist = []
-    vectvallist = []
-    catlist = []
     furthestval = 0
     furthestar = 0
 
-    # Do z value analysis
-    valdf = pd.DataFrame({'data':valraw})
-    ardf = pd.DataFrame({'data':arraw})
-    valz = stats.zscore(valdf['data'])
-    arz = stats.zscore(ardf['data'])
-    valzcoupled = []
-    arzcoupled = []
+    # # Do z value analysis
+    # valdf = pd.DataFrame({'data':valraw})
+    # ardf = pd.DataFrame({'data':arraw})
+    # valz = stats.zscore(valdf['data'])
+    # arz = stats.zscore(ardf['data'])
+    # valzcoupled = []
+    # arzcoupled = []
 
-    # Couple z values back into groups after analysis
-    i = 0
-    while i < len(valz)/2 :
-        valzcoupled.append([valz[i * 2], valz[i * 2 + 1]])
-        i += 1
+    # # Couple z values back into groups after analysis
+    # i = 0
+    # while i < len(valz)/2 :
+    #     valzcoupled.append([valz[i * 2], valz[i * 2 + 1]])
+    #     i += 1
 
-    i = 0
-    while i < len(arz)/2 :
-        arzcoupled.append([arz[i * 2], arz[i * 2 + 1]])
-        i += 1
+    # i = 0
+    # while i < len(arz)/2 :
+    #     arzcoupled.append([arz[i * 2], arz[i * 2 + 1]])
+    #     i += 1
 
     # Remove outliers and find highest value for normalisation
-    i = 0
-    zthresh = 1.9
-    for arzed, valzed in zip(arzcoupled, valzcoupled):
-        if valzed[0] >= zthresh or valzed[1] >= zthresh or arzed[0] >= zthresh or arzed[1] >= zthresh or valzed[0] <= -zthresh or valzed[1] <= -zthresh or arzed[0] <= -zthresh or arzed[1] <= -zthresh:
-            del vallist[i]
-            del arlist[i]
-            del namelist[i]
-            print("removed one")
-            i -= 1
-        else:
-            if vallist[i][0] > furthestval:
-                furthestval = vallist[i][0]
-            elif vallist[i][1] > furthestval:
-                furthestval = vallist[i][1]
-            if arlist[i][0] > furthestar:
-                furthestar = arlist[i][0]
-            elif arlist[i][1] > furthestar:
-                furthestar = arlist[i][1]
-        i += 1
-    print("Furthest arousal", furthestar)
-    print("Furthes valence", furthestval)
+    # i = 0
+    # zthresh = 1.9
+    # for arzed, valzed in zip(arzcoupled, valzcoupled):
+    #     if valzed[0] >= zthresh or valzed[1] >= zthresh or arzed[0] >= zthresh or arzed[1] >= zthresh or valzed[0] <= -zthresh or valzed[1] <= -zthresh or arzed[0] <= -zthresh or arzed[1] <= -zthresh:
+    #         del vallist[i]
+    #         del arlist[i]
+    #         del namelist[i]
+    #         print("removed one")
+    #         i -= 1
+    #     else:
+    #         if abs(vallist[i][0]) > furthestval:
+    #             furthestval = abs(vallist[i][0])
+    #         elif abs(vallist[i][1]) > furthestval:
+    #             furthestval = abs(vallist[i][1])
+    #         if abs(arlist[i][0]) > furthestar:
+    #             furthestar = abs(arlist[i][0])
+    #         elif abs(arlist[i][1]) > furthestar:
+    #             furthestar = abs(arlist[i][1])
+    #     i += 1
+    # print("Furthest arousal", furthestar)
+    # print("Furthes valence", furthestval)
 
     # print("Valence + Z list: ")
     # for zed in arzcoupled:
@@ -216,8 +213,54 @@ def batch(args):
     # for valence, zed in zip(arlist, arzcoupled):
     #     print(valence, " -- Z: ", zed)
 
+    # Do quartile value analysis
+    valQ1 = np.percentile(valraw, 25, interpolation = 'midpoint')
+    valQ3 = np.percentile(valraw, 75, interpolation = 'midpoint')
+    valIQR = valQ3 - valQ1
+    valUpper = valQ3 + (1.5 * valIQR)
+    valLower = valQ1 - (1.5 * valIQR)
+
+    arQ1 = np.percentile(arraw, 25, interpolation = 'midpoint')
+    arQ3 = np.percentile(arraw, 75, interpolation = 'midpoint')
+    arIQR = arQ3 - arQ1
+    arUpper = arQ3 + (1.5 * arIQR)
+    arLower = arQ1 - (1.5 * arIQR)
+
+    # Remove outliers and find highest value for normalisation
+    i = 0
+    filteredval = []
+    filteredar = []
+    filterednames = []
+    for val, ar, name in zip(vallist, arlist, namelist):
+        if valLower < val[0] > valUpper or valLower < val[1] > valUpper or arLower < ar[0] > arUpper or arLower < ar[1] > arUpper:
+            if verbose:
+                print("removed one")
+            i -= 1
+        else:
+            filteredval.append(val)
+            filteredar.append(ar)
+            filterednames.append(name)
+            if abs(val[0]) > furthestval:
+                furthestval = abs(val[0])
+            elif abs(val[1]) > furthestval:
+                furthestval = abs(val[1])
+            if abs(ar[0]) > furthestar:
+                furthestar = abs(ar[0])
+            elif abs(ar[1]) > furthestar:
+                furthestar = abs(ar[1])
+        i += 1
+    print("Furthest arousal", furthestar)
+    print("Furthes valence", furthestval)
+
+    normvallist = []
+    normarlist = []
+
+    vectarlist = []
+    vectvallist = []
+    catlist = []
+
     # Normalise valence/arousal and add both values for vector
-    for valentry, arentry in zip(vallist, arlist):
+    for valentry, arentry in zip(filteredval, filteredar):
         arnormentry = []
         valnormentry = []
 
@@ -229,16 +272,18 @@ def batch(args):
         normarlist.append(arnormentry)
 
         # Convert to vector and then category
-        limit=lambda a: (abs(a)+a)/2
-        vectval = limit(((valnormentry[0] - valnormentry[1]) + 2) / 4)
-        vectar = limit(((arnormentry[0] - arnormentry[1]) + 2) / 4)
+        vectval = ((valnormentry[0] - valnormentry[1]) + 2) / 4
+        vectar = ((arnormentry[0] - arnormentry[1]) + 2) / 4
 
         vectvallist.append(vectval)
         vectarlist.append(vectar)
 
         # For every vertical step (arousal) times 4 to count for whole row of 5 (it wil always stay below the actual one because of Math.floor)\
         # Then add the horizontal few 
-        catlist.append(math.floor(vectar * 5) * 4 + math.floor(vectval * 5))
+        category = (math.floor(vectar * 5) * 5 + math.floor(vectval * 5))
+        if category > 25:
+            category = 25
+        catlist.append(category)
 
     # Print lists
     # print("Valence list: ")
@@ -252,10 +297,24 @@ def batch(args):
     #     print(category)
 
     print("==============")
-    print("Namelist length:", len(namelist), " - Catlist length:", len(catlist), " - Vectvallist length:", len(vectvallist), " - Vectarlist length:", len(vectarlist))
+    os.makedirs(args.output_file, exist_ok=True)
+    if verbose:
+        print("Analysis information:")
+        print("Namelist length:", len(filterednames), " - Catlist length:", len(catlist), " - Vectvallist length:", len(vectvallist), " - Vectarlist length:", len(vectarlist))
+        print("==============")
+        HiVal = [item[0] for item in vallist]
+        LoVal = [item[1] for item in vallist]
+        HiAr = [item[0] for item in arlist]
+        LoAr = [item[1] for item in arlist]
+        print("Namelist length:", len(namelist), " - Catlist length:", len(catlist), " - Vallist length:", len(vallist), " - Arlist length:", len(arlist))
+        rawoutputfile = os.path.join(args.output_path, "analysisraw.csv")
+        rawdict = {'Filename': namelist, 'HiVal': HiVal, 'LoVal': LoVal, 'VQ1': valQ1, 'VQ3': valQ3, 'HiAr': HiAr, 'LoAr': LoAr, 'AQ1': arQ1, 'AQ3': arQ3}
+        rawcsv = pd.DataFrame(rawdict)
+        rawcsv.to_csv(rawoutputfile)
     outputfile = os.path.join(args.output_path, "analysis.csv")
     print("Saving to csv to: ", outputfile)
-    dict = {'Filename': namelist, 'Category': catlist, 'Valence vector': vectvallist, 'Arousal vector': vectarlist}
+    dict = {'Filename': filterednames, 'Category': catlist, 'Valence vector': vectvallist, 'Arousal vector': vectarlist}
+        
     csv = pd.DataFrame(dict)
     csv.to_csv(outputfile)
 
@@ -265,8 +324,9 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--types", default="midi_like", type=str, choices=["midi_like", "remi"])
     parser.add_argument("--task", default="ar_va", type=str, choices=["ar_va", "arousal", "valence"])
-    parser.add_argument("--input_path", required=True, type=str)
     parser.add_argument('--cuda', default='cuda:0', type=str)
+    parser.add_argument("--input_path", required=True, type=str)
     parser.add_argument('--output_path', default='./', type=str)
+    parser.add_argument('--verbose', default=True, type=bool)
     args = parser.parse_args()
     batch(args)
