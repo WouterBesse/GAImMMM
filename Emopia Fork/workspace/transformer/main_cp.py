@@ -40,8 +40,8 @@ parser.add_argument("--exp_name", default='output' , type=str)
 parser.add_argument("--load_ckt", default="none", type=str)   #pre-train model
 parser.add_argument("--load_ckt_loss", default="25", type=str)     #pre-train model
 parser.add_argument("--path_train_data", default='emopia', type=str)  
-parser.add_argument("--data_root", default='../dataset/co-representation/', type=str)
-parser.add_argument("--load_dict", default="more_dictionary.pkl", type=str)
+parser.add_argument("--data_root", default='/home/teun.buwalda/data/GAImMMM/Emopia Fork/workspace/transformer/co-representation', type=str) # <------- Deze map moet wijzen naar de co-representation folder op je server
+parser.add_argument("--load_dict", default="more_dictionary.pkl", type=str) # <------- Dit is de naam van je dictionary bestand. Good to note: Zorg ervoor dat je onze gebruikt, die moet je dan dus eerst ff in de co-representation map zetten
 parser.add_argument("--init_lr", default= 0.00001, type=float)
 # inference config
 
@@ -68,6 +68,11 @@ path_train_data = os.path.join(path_data_root, args.path_train_data + '_data_lin
 path_dictionary =  os.path.join(path_data_root, args.load_dict)
 path_train_idx = os.path.join(path_data_root, args.path_train_data + '_fn2idx_map.json')
 path_train_data_cls_idx = os.path.join(path_data_root, args.path_train_data + '_data_idx.npz')
+
+print("path_train_data:", path_train_data)
+print("path_dictionary:", path_dictionary)
+print("path_train_idx:", path_train_idx)
+print("path_train_data_cls_idx", path_train_data_cls_idx)
 
 assert os.path.exists(path_train_data)
 assert os.path.exists(path_dictionary)
@@ -238,7 +243,7 @@ def train():
     # init
     
 
-    if args.data_parallel > 0 and torch.cuda.count() > 1:
+    if args.data_parallel > 0 and torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         net = TransformerModel(n_class, data_parallel=True)
         net = nn.DataParallel(net)
