@@ -242,11 +242,11 @@ def batch(args):
             filterednames.append(name)
             if abs(val[0]) > furthestval:
                 furthestval = abs(val[0])
-            elif abs(val[1]) > furthestval:
+            if abs(val[1]) > furthestval:
                 furthestval = abs(val[1])
             if abs(ar[0]) > furthestar:
                 furthestar = abs(ar[0])
-            elif abs(ar[1]) > furthestar:
+            if abs(ar[1]) > furthestar:
                 furthestar = abs(ar[1])
         i += 1
     print("Furthest arousal", furthestar)
@@ -258,6 +258,11 @@ def batch(args):
     vectarlist = []
     vectvallist = []
     catlist = []
+
+    lowvvec = 1
+    hivvec = 0
+    lowavec = 1
+    hiavec = 0
 
     # Normalise valence/arousal and add both values for vector
     for valentry, arentry in zip(filteredval, filteredar):
@@ -278,9 +283,23 @@ def batch(args):
         vectvallist.append(vectval)
         vectarlist.append(vectar)
 
+        if vectval > hivvec:
+            hivvec = vectval
+        if vectar > hiavec:
+            hiavec = vectar
+        if vectval < lowvvec:
+            lowvvec = vectval
+        if vectar < lowavec:
+            lowavec = vectar
+
         # For every vertical step (arousal) times 4 to count for whole row of 5 (it wil always stay below the actual one because of Math.floor)\
         # Then add the horizontal few 
-        category = (math.floor(vectar * 5) * 5 + math.floor(vectval * 5))
+
+    valmult = 1/(hivvec - lowvvec) 
+    armult = 1/(hiavec - lowavec)
+    
+    for vectval, vectar in zip(vectvallist, vectarlist):
+        category = (math.floor((vectar-lowavec) * armult * 5) * 5 + math.floor((vectval-lowvvec) * valmult * 5))
         if category > 25:
             category = 25
         catlist.append(category)
