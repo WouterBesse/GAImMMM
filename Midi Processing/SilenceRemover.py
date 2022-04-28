@@ -7,17 +7,12 @@ from mido import MidiFile, MidiTrack
 from argparse import ArgumentParser, Namespace
 import multiprocessing as mp
 
-succeeded = 0
-failed = 0
-
 # clearConsole script acquired from https://www.delftstack.com/howto/python/python-clear-console/
 def clearConsole():
     command = 'clear'
     if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
         command = 'cls'
     os.system(command)
-
-#clearConsole()
 
 # getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
 def getListOfFiles(dirName):
@@ -98,23 +93,23 @@ def evaluate_par(args):
     tt = 0
     resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path) for file in listOfFiles]).get()
     print("appelflap")
-    # while c < len(listOfFiles):
-    #     ts = time.time()
-    #     n = 0
-    #     result = []
+    while c < len(listOfFiles):
+        ts = time.time()
+        n = 0
+        result = []
         
-    #     print("Current file =", listOfFiles[c])
-    #     print("Files succeeded =", succeeded)
-    #     print("Files failed =", failed)
+        print("Current file =", listOfFiles[c])
+        print("Files succeeded =", succeeded)
+        print("Files failed =", failed)
         
-    #     n += 1
-    #     c += 1
-    #     succeeded += result[0]
-    #     failed += result[1]
-    #     resultaten.append(result)
-    #     clearConsole()
-    #     print("Time in parallel for 16: ", tt)
-    #     tt = time.time()-ts
+        n += 1
+        c += 1
+        succeeded += result[0]
+        failed += result[1]
+        resultaten.append(result)
+        clearConsole()
+        print("Time in parallel for 16: ", tt)
+        tt = time.time()-ts
     pool.close
     pool.join
     print("Done <3")
@@ -130,9 +125,9 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/"):
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
-        remove_drums(full_path, outputpath)
+        remove_silence(full_path, outputpath)
         try:
-            remove_drums(full_path, outputpath)
+            remove_silence(full_path, outputpath)
             # print("Succeeded")
         except Exception:
             print("Failed :(")
@@ -142,7 +137,8 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/"):
     # print("Files done :", succeeded)
     return (fail, succeed)
 
-def remove_drums(inputpath, outputpath):
+
+def remove_silence(input_path, output_path):
     # Get the name of the file and make a file place for it
     filename = os.path.basename(inputpath)
     outputfile = os.path.join(outputpath, filename)
@@ -154,36 +150,44 @@ def remove_drums(inputpath, outputpath):
     # Copy time metrics between both files
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
 
+    first_time = 10000 # arbitrary for now; this will be the song's start time
+
+    # Find the timestamp for the first note_on message in all tracks
+    # and the timestamp for the last note
     for original_track in input_midi.tracks:
-        new_track = MidiTrack()
+        print('new track')
+        found_first_note = False
 
-        note_time = 0
-        # Iterate through all messages in track
         for msg in original_track:
-            # Add the time value of the current note
-            # If previous note wasn't channel 9, this will be 0
-            # If it was it will be added to the previous note
-            note_time += msg.time
 
-            # Only notes of this type have channel, so only check it for them
-            if msg.type in ['note_on', 'note_off', 'control_change']:
-                # Only add note if channel is not 9
-                if msg.channel != 8:
-                    new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
-                    # Reset note time
-                    note_time = 0
+            if (not found_first_note) and msg.type == 'note_on':
+                msg_time = original_track[0].time
+                if msg_time < first_time:
+                    first_time = msg_time
+                
+                found_first_note = True
+
+        # Mido can calculate end time; failsafe with final note_off message
+        for msg in reversed(original_track):
+            if original_track[-2].type == 'note_off':
+                end_time = msg.time
             else:
-                # Always add all messages of other types
-                new_track.append(msg.copy(type=msg.type, time=note_time))
-                # Reset note time
-                note_time=0
+                end_time = input_midi.length
+    
+    print('First start time for this file:', first_time)
 
-        # MIDI files are multitrack. Here we append
-        # the new track with mapped notes to the output file
-        output_midi.tracks.append(new_track)
+    # Subtract the start time from all messages;
+    # song should now begin start_time ticks earlier
+    for original_track in input_midi.tracks:
+        for msg in original_track:
+            msg.dict()['time'] -= first_time
+            if msg.dict()['time'] < 0:
+                msg.dict()['time'] = 0
 
-    output_midi.save(outputfile)
+    # TODO: actually make end_time the end time
+
     return [output_midi, outputfile]
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
