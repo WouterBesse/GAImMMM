@@ -59,7 +59,7 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.output_path)
+        result = tryremove(args.input_path, file, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
@@ -96,7 +96,7 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path) for file in listOfFiles]).get()
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path, args.action) for file in listOfFiles]).get()
     print("appelflap")
     # while c < len(listOfFiles):
     #     ts = time.time()
@@ -121,7 +121,7 @@ def evaluate_par(args):
 
     # for file in listOfFiles:
 # inputpath, filename, outputpath = "./newdataset/"
-def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/"):
+def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
     
@@ -130,9 +130,14 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/"):
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
-        remove_drums(full_path, outputpath)
         try:
-            remove_drums(full_path, outputpath)
+            if action == "rm-perc":
+                remove_drums(full_path, outputpath)
+            elif action == "rm-silence":
+                remove_silence(full_path, outputpath)
+            else:
+                error("Invalid argument for --action")
+
             # print("Succeeded")
         except Exception:
             print("Failed :(")
@@ -190,6 +195,8 @@ if __name__ == '__main__':
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
+    parser.add_argument("--action", default="rm-perc", type=str,
+        choices=['rm-perc', 'rm-silence'])
     args = parser.parse_args()
     if args.parallel == 0:
         evaluate(args)
