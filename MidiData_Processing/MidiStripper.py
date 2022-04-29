@@ -1,4 +1,5 @@
 # from pathlib import Path
+from math import ceil
 import os.path
 import os
 import time
@@ -16,8 +17,6 @@ def clearConsole():
     if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
         command = 'cls'
     os.system(command)
-
-#clearConsole()
 
 # getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
 def getListOfFiles(dirName):
@@ -47,8 +46,9 @@ def evaluate(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    clearConsole()
-    print("Amount of files to process =", len(listOfFiles))
+    # clearConsole()
+    print("Number of files to process =", len(listOfFiles))
+    print("Action:", args.action)
 
     resultaten = []
     t = 0
@@ -59,11 +59,11 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.output_path, args.action)
-        succeeded += result[0]
-        failed += result[1]
+        result = tryremove(args.input_path, file, args.output_path, args.action, )
+        failed += result[0]
+        succeeded += result[1]
         resultaten.append(result)
-        clearConsole()
+        # clearConsole()
         tt += time.time()-ts
         if t == 15:
             t = 0
@@ -121,29 +121,33 @@ def evaluate_par(args):
 
     # for file in listOfFiles:
 # inputpath, filename, outputpath = "./newdataset/"
-def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action = "rm-perc"):
+def tryremove(inputpath, filename, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
     fail = 0
+    succeed = 0
     filetosave = []
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
-        try:
-            if action == "rm-perc":
-                remove_drums(full_path, outputpath)
-            elif action == "rm-silence":
-                remove_silence(full_path, outputpath)
-            else:
-                raise ArgumentError("Invalid argument for --action:", action)
+        if action == "rm-perc":
+            remove_drums(full_path, outputpath)
+        elif action == "rm-silence":
+            remove_silence(full_path, outputpath)
+        else:
+            raise ArgumentError("Invalid argument for --action:", action)
+        # try:
+            
 
-            # print("Succeeded")
-        except Exception:
-            print("Failed :(")
-            pass
+        #     # print("Succeeded")
+        #     succeed = 1
+        # except Exception:
+        #     print("Failed :(")
+        #     fail = 1
+        #     pass
     clearConsole()
     print("Taken time: ", time.time() - st)
-    # print("Files done :", succeeded)
+    succeed = 1
     return (fail, succeed)
 
 def remove_drums(inputpath, outputpath):
@@ -206,25 +210,22 @@ def remove_silence(inputpath, outputpath):
     # Find the timestamp for the first note_on message in all tracks
     # and the timestamp for the last note
     for original_track in input_midi.tracks:
-        print('new track')
-        found_first_note = False
-
+        # Store the first note's timestamp in first_time
         for msg in original_track:
-
-            if (not found_first_note) and msg.type == 'note_on':
-                msg_time = original_track[0].time
+            if msg.type == 'note_on':
+                msg_time = msg.time
                 if msg_time < first_time:
                     first_time = msg_time
-                
-                found_first_note = True
-
+                break
+        
         # Mido can calculate end time; failsafe with final note_off message
-        for msg in reversed(original_track):
-            if original_track[-2].type == 'note_off':
-                end_time = msg.time
-            else:
-                end_time = input_midi.length
-    
+        if original_track[-2].type == 'note_off':
+            end_time = original_track[-2].time
+            print('End time decided by note_off message:', end_time)
+        else:
+            end_time = ceil(input_midi.length)
+            print('End time decided by mido length property:', end_time)
+
     print('First start time for this file:', first_time)
 
     for original_track in input_midi.tracks:
@@ -236,7 +237,6 @@ def remove_silence(inputpath, outputpath):
                 msg.time -= first_time
                 if msg.time < 0:
                     msg.time = 0
-                    print('New start time for {0} was below zero'.format(msg.dict()))
                 break
 
         # Make sure the song ends at end_time
@@ -246,7 +246,6 @@ def remove_silence(inputpath, outputpath):
             if msg.type == 'note_off':
                 if msg.time > end_time:
                     msg.time = end_time
-                    print('changed a note_off message:', msg.dict())
                 break
 
             # If this track seems to have no note_off messages,
@@ -256,7 +255,7 @@ def remove_silence(inputpath, outputpath):
             
             handled_msgs += 1    
 
-    output_midi.save(outputfile)
+    input_midi.save(outputfile)
     return [output_midi, outputfile]
 
 if __name__ == '__main__':
