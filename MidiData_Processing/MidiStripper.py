@@ -46,7 +46,7 @@ def evaluate(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    # clearConsole()
+    clearConsole()
     print("Number of files to process =", len(listOfFiles))
     print("Action:", args.action)
 
@@ -63,7 +63,7 @@ def evaluate(args):
         failed += result[0]
         succeeded += result[1]
         resultaten.append(result)
-        # clearConsole()
+        clearConsole()
         tt += time.time()-ts
         if t == 15:
             t = 0
@@ -96,7 +96,7 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path, args.action) for file in listOfFiles]).get()
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, args.output_path, args.action) for file in listOfFiles]).get()
     print("appelflap")
     # while c < len(listOfFiles):
     #     ts = time.time()
@@ -130,21 +130,19 @@ def tryremove(inputpath, filename, outputpath = "./newdataset/", action = "rm-pe
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
-        if action == "rm-perc":
-            remove_drums(full_path, outputpath)
-        elif action == "rm-silence":
-            remove_silence(full_path, outputpath)
-        else:
-            raise ArgumentError("Invalid argument for --action:", action)
-        # try:
-            
-
-        #     # print("Succeeded")
-        #     succeed = 1
-        # except Exception:
-        #     print("Failed :(")
-        #     fail = 1
-        #     pass
+        try:
+            if action == "rm-perc":
+                remove_drums(full_path, outputpath)
+            elif action == "rm-silence":
+                remove_silence(full_path, outputpath)
+            else:
+                raise ArgumentError("Invalid argument for --action:", action)
+            print("Succeeded :D")
+            succeed = 1
+        except Exception as e:
+            print("Failed :( error:", e.message)
+            fail = 1
+            pass
     clearConsole()
     print("Taken time: ", time.time() - st)
     succeed = 1
