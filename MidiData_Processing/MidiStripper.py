@@ -4,7 +4,7 @@ import os
 import time
 
 from mido import MidiFile, MidiTrack
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentError, ArgumentParser, Namespace
 import multiprocessing as mp
 
 succeeded = 0
@@ -124,7 +124,6 @@ def evaluate_par(args):
 def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
-    
     fail = 0
     filetosave = []
 
@@ -136,7 +135,7 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action
             elif action == "rm-silence":
                 remove_silence(full_path, outputpath)
             else:
-                error("Invalid argument for --action")
+                raise ArgumentError("Invalid argument for --action:", action)
 
             # print("Succeeded")
         except Exception:
@@ -186,6 +185,76 @@ def remove_drums(inputpath, outputpath):
         # MIDI files are multitrack. Here we append
         # the new track with mapped notes to the output file
         output_midi.tracks.append(new_track)
+
+    output_midi.save(outputfile)
+    return [output_midi, outputfile]
+
+def remove_silence(inputpath, outputpath):
+    # Get the name of the file and make a file place for it
+    filename = os.path.basename(inputpath)
+    outputfile = os.path.join(outputpath, filename)
+
+    # Import wanted midi file
+    input_midi = MidiFile(inputpath, clip=True)
+    # Create output midi file
+    output_midi = MidiFile()
+    # Copy time metrics between both files
+    output_midi.ticks_per_beat = input_midi.ticks_per_beat
+
+    first_time = 10000 # arbitrary for now; this will be the song's start time
+
+    # Find the timestamp for the first note_on message in all tracks
+    # and the timestamp for the last note
+    for original_track in input_midi.tracks:
+        print('new track')
+        found_first_note = False
+
+        for msg in original_track:
+
+            if (not found_first_note) and msg.type == 'note_on':
+                msg_time = original_track[0].time
+                if msg_time < first_time:
+                    first_time = msg_time
+                
+                found_first_note = True
+
+        # Mido can calculate end time; failsafe with final note_off message
+        for msg in reversed(original_track):
+            if original_track[-2].type == 'note_off':
+                end_time = msg.time
+            else:
+                end_time = input_midi.length
+    
+    print('First start time for this file:', first_time)
+
+    for original_track in input_midi.tracks:
+        # Subtract the start time from the first note
+        # Since time is stored relatively,
+        # the song should now begin start_time ticks earlier
+        for msg in original_track:
+            if msg.type == 'note_on':
+                msg.time -= first_time
+                if msg.time < 0:
+                    msg.time = 0
+                    print('New start time for {0} was below zero'.format(msg.dict()))
+                break
+
+        # Make sure the song ends at end_time
+        handled_msgs = 0
+        for msg in reversed(original_track):
+            # The last note_off should be at end_time
+            if msg.type == 'note_off':
+                if msg.time > end_time:
+                    msg.time = end_time
+                    print('changed a note_off message:', msg.dict())
+                break
+
+            # If this track seems to have no note_off messages,
+            # just make sure the last message is directly at the end time
+            elif msg.type == 'note_on' and handled_msgs > 3:
+                original_track[-1].time = end_time
+            
+            handled_msgs += 1    
 
     output_midi.save(outputfile)
     return [output_midi, outputfile]
