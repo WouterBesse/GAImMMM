@@ -47,7 +47,8 @@ def evaluate(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    clearConsole()
+    if args.clear_csl == True:
+        clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
     resultaten = []
@@ -59,11 +60,12 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.output_path, args.action)
+        result = tryremove(args.input_path, file, args.split_time, args.clr_csl, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
-        clearConsole()
+        if args.clear_csl == True:
+            clearConsole()
         tt += time.time()-ts
         if t == 15:
             t = 0
@@ -85,7 +87,8 @@ def evaluate_par(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    clearConsole()
+    if args.clear_csl == True:
+        clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
     pool = mp.Pool(mp.cpu_count())
@@ -96,8 +99,8 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path, args.action) for file in listOfFiles]).get()
-    print("appelflap")
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.split_time, args.clr_csl, args.output_path, args.action) for file in listOfFiles]).get()
+
     # while c < len(listOfFiles):
     #     ts = time.time()
     #     n = 0
@@ -121,7 +124,7 @@ def evaluate_par(args):
 
     # for file in listOfFiles:
 # inputpath, filename, outputpath = "./newdataset/"
-def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action = "rm-perc"):
+def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
     fail = 0
@@ -134,6 +137,8 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action
                 remove_drums(full_path, outputpath)
             elif action == "rm-silence":
                 remove_silence(full_path, outputpath)
+            elif action == "split":
+                split_midi(full_path, outputpath, split_time)
             else:
                 raise ArgumentError("Invalid argument for --action:", action)
 
@@ -141,7 +146,8 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action
         except Exception:
             print("Failed :(")
             pass
-    clearConsole()
+    if clear_csl == True:
+        clearConsole()
     print("Taken time: ", time.time() - st)
     # print("Files done :", succeeded)
     return (fail, succeed)
@@ -259,13 +265,60 @@ def remove_silence(inputpath, outputpath):
     output_midi.save(outputfile)
     return [output_midi, outputfile]
 
+def split_midi(inputpath, outputpath, duration):
+    # Get the name of the file and make a file place for it
+    filename = os.path.basename(inputpath)
+    outputfile = os.path.join(outputpath, filename)
+
+    # Import wanted midi file
+    input_midi = MidiFile(inputpath, clip=True)
+    # Create output midi file
+    output_midi = MidiFile()
+    # Copy time metrics between both files
+    output_midi.ticks_per_beat = input_midi.ticks_per_beat
+
+    print(input_midi)
+
+    # for original_track in input_midi.tracks:
+    #     new_track = MidiTrack()
+
+    #     note_time = 0
+    #     # Iterate through all messages in track
+    #     for msg in original_track:
+    #         # Add the time value of the current note
+    #         # If previous note wasn't channel 9, this will be 0
+    #         # If it was it will be added to the previous note
+    #         note_time += msg.time
+
+    #         # Only notes of this type have channel, so only check it for them
+    #         if msg.type in ['note_on', 'note_off', 'control_change']:
+    #             # Only add note if channel is not 9
+    #             if msg.channel != 8:
+    #                 new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
+    #                 # Reset note time
+    #                 note_time = 0
+    #         else:
+    #             # Always add all messages of other types
+    #             new_track.append(msg.copy(type=msg.type, time=note_time))
+    #             # Reset note time
+    #             note_time=0
+
+    #     # MIDI files are multitrack. Here we append
+    #     # the new track with mapped notes to the output file
+    #     output_midi.tracks.append(new_track)
+
+    # output_midi.save(outputfile)
+    # return [output_midi, outputfile]
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
     parser.add_argument("--action", default="rm-perc", type=str,
-        choices=['rm-perc', 'rm-silence'])
+        choices=['rm-perc', 'rm-silence', 'split'])
+    parser.add_argument("--split_time", default=40, type=int)
+    parser.add_argument("--clear_csl", default=True, type=bool)
     args = parser.parse_args()
     if args.parallel == 0:
         evaluate(args)
