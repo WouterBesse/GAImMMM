@@ -133,20 +133,20 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
 
     full_path = os.path.join(inputpath, filename)
     if os.path.isfile(full_path):
-        # try:
-        if action == "rm-perc":
-            remove_drums(full_path, outputpath)
-        elif action == "rm-silence":
-            remove_silence(full_path, outputpath)
-        elif action == "split":
-            split_midi(full_path, outputpath, split_time)
-        else:
-            raise ArgumentError("Invalid argument for --action:", action)
+        try:
+            if action == "rm-perc":
+                remove_drums(full_path, outputpath)
+            elif action == "rm-silence":
+                remove_silence(full_path, outputpath)
+            elif action == "split":
+                split_midi(full_path, outputpath, split_time)
+            else:
+                raise ArgumentError("Invalid argument for --action:", action)
 
-            # print("Succeeded")
-        # except Exception:
-        #     print("Failed :(")
-        #     pass
+            print("Succeeded")
+        except Exception:
+            print("Failed :(")
+            pass
     if clear_csl == 1:
         clearConsole()
     print("Taken time: ", time.time() - st)
@@ -225,6 +225,8 @@ def remove_silence(inputpath, outputpath):
                     first_time = msg_time
                 
                 found_first_note = True
+                print('found note on')
+            print(msg)
 
         # Mido can calculate end time; failsafe with final note_off message
         for msg in reversed(original_track):
@@ -232,6 +234,7 @@ def remove_silence(inputpath, outputpath):
                 end_time = msg.time
             else:
                 end_time = input_midi.length
+            print(msg)
     
     print('First start time for this file:', first_time)
 
@@ -301,7 +304,6 @@ def split_midi(inputpath, outputpath, duration):
     
     new_track = MidiTrack()
 
-
     mergedtracks = merge_tracks(input_midi.tracks)
 
     curtempo = 0
@@ -313,16 +315,10 @@ def split_midi(inputpath, outputpath, duration):
     note_time = 0
     time_elapsed = 0
 
-    # print("Tempo length: ", len(tempo_map[0]))
-    clearConsole()
-    # print(tempo_map[0])
-    print(mergedtracks)
-
     for msg in mergedtracks:
         # Keep count of how many ticks have passed
         note_time += msg.time
 
-        # print("Current tempo index is: ",curtempo + 1, " -- Current time elapsed is: ",time_elapsed)
         # If we passed a tempo change, add the time elapsed before the change and after the change to the time_elapsed and count that we are on a new tempo index
         try:
             if note_time >= tempo_map[0][curtempo + 1]:
@@ -332,7 +328,6 @@ def split_midi(inputpath, outputpath, duration):
                 time_per_tick = tempo_map[1][curtempo]/resolution
                 time_after_change = ticks_after_change * time_per_tick
                 
-
                 time_elapsed += time_before_change + time_after_change
             else:
                 time_elapsed += msg.time*time_per_tick
@@ -345,7 +340,6 @@ def split_midi(inputpath, outputpath, duration):
             # Create directory and save track
             filename = os.path.basename(inputpath)
             output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
-            # new_track.append(mergedtracks[-1].copy())
             save_midi(new_track, output_dir, resolution)
 
             # Reset time counter and create new midi track
@@ -371,7 +365,7 @@ if __name__ == '__main__':
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
     parser.add_argument("--action", default="rm-perc", type=str,
-        choices=['rm-perc', 'rm-silence', 'split'])
+        choices=['rm-perc', 'rm-silence', 'split', 'all'])
     parser.add_argument("--channel_limit", default=4, type=int)
     parser.add_argument("--split_time", default=40, type=int) # In seconds
     parser.add_argument("--clear_csl", default=1, type=int)
