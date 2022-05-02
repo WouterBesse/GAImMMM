@@ -1,5 +1,6 @@
 # from pathlib import Path
 from linecache import clearcache
+from math import ceil
 import os.path
 import os
 import time
@@ -141,10 +142,10 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 split_midi(full_path, outputpath, split_time)
             else:
                 raise ArgumentError("Invalid argument for --action:", action)
-
-            print("Succeeded")
-        except Exception:
-            print("Failed :(")
+            print("Succeeded :D")
+        except Exception as e:
+            print("Failed :( error:", e.message)
+            fail = 1
             pass
     if clear_csl == 1:
         clearConsole()
@@ -219,19 +220,16 @@ def remove_silence(inputpath, outputpath):
                 msg_time = msg.time
                 if msg_time < first_time:
                     first_time = msg_time
-                
-                found_first_note = True
-                print('found note on')
-            print(msg)
-
+                break
+        
         # Mido can calculate end time; failsafe with final note_off message
-        for msg in reversed(original_track):
-            if original_track[-2].type == 'note_off':
-                end_time = msg.time
-            else:
-                end_time = input_midi.length
-            print(msg)
-    
+        if original_track[-2].type == 'note_off':
+            end_time = original_track[-2].time
+            print('End time decided by note_off message:', end_time)
+        else:
+            end_time = ceil(input_midi.length)
+            print('End time decided by mido length property:', end_time)
+
     print('First start time for this file:', first_time)
 
     for original_track in input_midi.tracks:
