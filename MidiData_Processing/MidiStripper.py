@@ -1,9 +1,11 @@
 # from pathlib import Path
+from linecache import clearcache
+from math import ceil
 import os.path
 import os
 import time
 
-from mido import MidiFile, MidiTrack
+from mido import MidiFile, MidiTrack, merge_tracks, MetaMessage
 from argparse import ArgumentError, ArgumentParser, Namespace
 import multiprocessing as mp
 
@@ -16,8 +18,6 @@ def clearConsole():
     if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
         command = 'cls'
     os.system(command)
-
-#clearConsole()
 
 # getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
 def getListOfFiles(dirName):
@@ -47,7 +47,8 @@ def evaluate(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    clearConsole()
+    if args.clear_csl == 1:
+        clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
     resultaten = []
@@ -59,11 +60,12 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.output_path, args.action)
+        result = tryremove(args.input_path, file, args.split_time, args.clr_csl, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
-        clearConsole()
+        if args.clear_csl == 1:
+            clearConsole()
         tt += time.time()-ts
         if t == 15:
             t = 0
@@ -85,7 +87,8 @@ def evaluate_par(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    clearConsole()
+    if args.clear_csl == 1:
+        clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
     pool = mp.Pool(mp.cpu_count())
@@ -96,8 +99,8 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.output_path, args.action) for file in listOfFiles]).get()
-    print("appelflap")
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action) for file in listOfFiles]).get()
+
     # while c < len(listOfFiles):
     #     ts = time.time()
     #     n = 0
@@ -121,10 +124,11 @@ def evaluate_par(args):
 
     # for file in listOfFiles:
 # inputpath, filename, outputpath = "./newdataset/"
-def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action = "rm-perc"):
+def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
     fail = 0
+    succeed = 0
     filetosave = []
 
     full_path = os.path.join(inputpath, filename)
@@ -134,16 +138,19 @@ def tryremove(inputpath, filename, succeed, outputpath = "./newdataset/", action
                 remove_drums(full_path, outputpath)
             elif action == "rm-silence":
                 remove_silence(full_path, outputpath)
+            elif action == "split":
+                split_midi(full_path, outputpath, split_time)
             else:
                 raise ArgumentError("Invalid argument for --action:", action)
-
-            # print("Succeeded")
-        except Exception:
-            print("Failed :(")
+            print("Succeeded :D")
+        except Exception as e:
+            print("Failed :( error:", e.message)
+            fail = 1
             pass
-    clearConsole()
+    if clear_csl == 1:
+        clearConsole()
     print("Taken time: ", time.time() - st)
-    # print("Files done :", succeeded)
+    succeed = 1
     return (fail, succeed)
 
 def remove_drums(inputpath, outputpath):
@@ -157,6 +164,7 @@ def remove_drums(inputpath, outputpath):
     output_midi = MidiFile()
     # Copy time metrics between both files
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
+
 
     for original_track in input_midi.tracks:
         new_track = MidiTrack()
@@ -206,25 +214,22 @@ def remove_silence(inputpath, outputpath):
     # Find the timestamp for the first note_on message in all tracks
     # and the timestamp for the last note
     for original_track in input_midi.tracks:
-        print('new track')
-        found_first_note = False
-
+        # Store the first note's timestamp in first_time
         for msg in original_track:
-
-            if (not found_first_note) and msg.type == 'note_on':
-                msg_time = original_track[0].time
+            if msg.type == 'note_on':
+                msg_time = msg.time
                 if msg_time < first_time:
                     first_time = msg_time
-                
-                found_first_note = True
-
+                break
+        
         # Mido can calculate end time; failsafe with final note_off message
-        for msg in reversed(original_track):
-            if original_track[-2].type == 'note_off':
-                end_time = msg.time
-            else:
-                end_time = input_midi.length
-    
+        if original_track[-2].type == 'note_off':
+            end_time = original_track[-2].time
+            print('End time decided by note_off message:', end_time)
+        else:
+            end_time = ceil(input_midi.length)
+            print('End time decided by mido length property:', end_time)
+
     print('First start time for this file:', first_time)
 
     for original_track in input_midi.tracks:
@@ -236,7 +241,6 @@ def remove_silence(inputpath, outputpath):
                 msg.time -= first_time
                 if msg.time < 0:
                     msg.time = 0
-                    print('New start time for {0} was below zero'.format(msg.dict()))
                 break
 
         # Make sure the song ends at end_time
@@ -246,7 +250,6 @@ def remove_silence(inputpath, outputpath):
             if msg.type == 'note_off':
                 if msg.time > end_time:
                     msg.time = end_time
-                    print('changed a note_off message:', msg.dict())
                 break
 
             # If this track seems to have no note_off messages,
@@ -256,8 +259,97 @@ def remove_silence(inputpath, outputpath):
             
             handled_msgs += 1    
 
-    output_midi.save(outputfile)
+    input_midi.save(outputfile)
     return [output_midi, outputfile]
+
+def get_tempos(input_track):
+    tempo_map = [[],[],[]]
+    note_time = 0
+
+    # Iterate through all messages in track
+    for msg in input_track:
+        # Add the time value of the current note, so we keep counting up
+        note_time += msg.time
+
+        if msg.type == 'set_tempo':
+            # Making a vector with two other vectors, vector 1 = on which tick a new tempo is set, vector 2 = what that tempo is
+            tempo_map[0].append(note_time)
+            tempo_map[1].append(msg.tempo)
+            tempo_map[2].append(msg.copy(time=0))
+    
+    return(tempo_map)
+
+def save_midi(curtrack, destination, resolution):
+    output_midi = MidiFile()
+    # Copy time metrics
+    output_midi.ticks_per_beat = resolution
+    print(curtrack)
+    # Save track
+    output_midi.tracks.append(curtrack)
+    output_midi.save(destination)
+
+def split_midi(inputpath, outputpath, duration):
+    curfile = 0
+
+    # Import midi file
+    input_midi = MidiFile(inputpath, clip=True) 
+    
+    new_track = MidiTrack()
+
+    mergedtracks = merge_tracks(input_midi.tracks)
+
+    curtempo = 0
+    tempo_map = get_tempos(mergedtracks)
+    resolution = input_midi.ticks_per_beat
+
+    time_per_tick = tempo_map[1][curtempo]/resolution
+
+    note_time = 0
+    time_elapsed = 0
+
+    for msg in mergedtracks:
+        # Keep count of how many ticks have passed
+        note_time += msg.time
+
+        # If we passed a tempo change, add the time elapsed before the change and after the change to the time_elapsed and count that we are on a new tempo index
+        try:
+            if note_time >= tempo_map[0][curtempo + 1]:
+                curtempo += 1
+                ticks_after_change = note_time - tempo_map[0][curtempo]
+                time_before_change = (msg.time - ticks_after_change) * time_per_tick
+                time_per_tick = tempo_map[1][curtempo]/resolution
+                time_after_change = ticks_after_change * time_per_tick
+                
+                time_elapsed += time_before_change + time_after_change
+            else:
+                time_elapsed += msg.time*time_per_tick
+        except:
+            time_elapsed += msg.time*time_per_tick
+            pass
+        # If the time counter is above duration in seconds and the current message is not at the same time as the previous one (that would be nice to keep)
+        if time_elapsed > duration*(10**6) and msg.time != 0:
+            print('Saving File')
+            # Create directory and save track
+            filename = os.path.basename(inputpath)
+            output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
+            save_midi(new_track, output_dir, resolution)
+
+            # Reset time counter and create new midi track
+            time_elapsed = 0
+            curfile += 1
+            new_track = MidiTrack()
+            new_track.append(tempo_map[2][curtempo])
+            new_track.append(msg.copy(time=0))
+        else:
+            new_track.append(msg.copy())
+    
+    print('Saving File')
+    # Create directory and save track
+    filename = os.path.basename(inputpath)
+    output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
+    # new_track.append(mergedtracks[-1].copy())
+    save_midi(new_track, output_dir, resolution)
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -265,7 +357,10 @@ if __name__ == '__main__':
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
     parser.add_argument("--action", default="rm-perc", type=str,
-        choices=['rm-perc', 'rm-silence'])
+        choices=['rm-perc', 'rm-silence', 'split', 'all'])
+    parser.add_argument("--channel_limit", default=4, type=int)
+    parser.add_argument("--split_time", default=40, type=int) # In seconds
+    parser.add_argument("--clear_csl", default=1, type=int)
     args = parser.parse_args()
     if args.parallel == 0:
         evaluate(args)
