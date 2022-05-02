@@ -3,7 +3,7 @@ import os.path
 import os
 import time
 
-from mido import MidiFile, MidiTrack
+from mido import MidiFile, MidiTrack, merge_tracks
 from argparse import ArgumentError, ArgumentParser, Namespace
 import multiprocessing as mp
 
@@ -47,7 +47,7 @@ def evaluate(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    if args.clear_csl == True:
+    if args.clear_csl == 1:
         clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
@@ -64,7 +64,7 @@ def evaluate(args):
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
-        if args.clear_csl == True:
+        if args.clear_csl == 1:
             clearConsole()
         tt += time.time()-ts
         if t == 15:
@@ -87,7 +87,7 @@ def evaluate_par(args):
     listOfFiles = getListOfFiles(args.input_path)
 
     # Quick information on what you are doing
-    if args.clear_csl == True:
+    if args.clear_csl == 1:
         clearConsole()
     print("Amount of files to process =", len(listOfFiles))
 
@@ -99,7 +99,7 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.split_time, args.clr_csl, args.output_path, args.action) for file in listOfFiles]).get()
+    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action) for file in listOfFiles]).get()
 
     # while c < len(listOfFiles):
     #     ts = time.time()
@@ -146,7 +146,7 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
         except Exception:
             print("Failed :(")
             pass
-    if clear_csl == True:
+    if clear_csl == 1:
         clearConsole()
     print("Taken time: ", time.time() - st)
     # print("Files done :", succeeded)
@@ -163,6 +163,7 @@ def remove_drums(inputpath, outputpath):
     output_midi = MidiFile()
     # Copy time metrics between both files
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
+
 
     for original_track in input_midi.tracks:
         new_track = MidiTrack()
@@ -265,47 +266,74 @@ def remove_silence(inputpath, outputpath):
     output_midi.save(outputfile)
     return [output_midi, outputfile]
 
+def get_tempos(input_midi):
+    tempo_map = [[],[]]
+    for original_track in input_midi.tracks:
+
+        note_time = 0
+
+        # Iterate through all messages in track
+        for msg in original_track:
+            # Add the time value of the current note, so we keep counting up
+            note_time += msg.time
+
+            if msg.type in ['set_tempo']:
+                # Making a vector with two other vectors, vector 1 = on which tick a new tempo is set, vector 2 = what that tempo is
+                tempo_map[0].append(note_time)
+                tempo_map[1].append(msg.tempo)
+    
+    return(tempo_map)
+
 def split_midi(inputpath, outputpath, duration):
     # Get the name of the file and make a file place for it
     filename = os.path.basename(inputpath)
-    outputfile = os.path.join(outputpath, filename)
+    outputfiles = []
+    output_midis = []
 
     # Import wanted midi file
     input_midi = MidiFile(inputpath, clip=True)
+    
     # Create output midi file
-    output_midi = MidiFile()
-    # Copy time metrics between both files
-    output_midi.ticks_per_beat = input_midi.ticks_per_beat
+    # outputfile = os.path.join(outputpath, filename)
+    curfile = 0
+    outputfiles.append(os.path.join(outputpath, filename + str(curfile)))
+    print('kaas')
+    output_midis.append(MidiFile())
+    
+    # Copy time metrics
+    output_midis[curfile].ticks_per_beat = input_midi.ticks_per_beat
+    
+    curtempo = 0
+    tempo_map = get_tempos(input_midi)
+    resolution = input_midi.ticks_per_beat
 
-    print(input_midi)
+    time_per_tick = tempo_map[1][curtempo]/resolution
 
-    # for original_track in input_midi.tracks:
-    #     new_track = MidiTrack()
+    mergedtracks = merge_tracks(input_midi.tracks)
+    # print(mergedtracks)
+    # output_midi.tracks.append(mergedtracks)
+    # output_midi.save(outputfile)
 
-    #     note_time = 0
-    #     # Iterate through all messages in track
-    #     for msg in original_track:
-    #         # Add the time value of the current note
-    #         # If previous note wasn't channel 9, this will be 0
-    #         # If it was it will be added to the previous note
-    #         note_time += msg.time
+    note_time = 0
+    
 
-    #         # Only notes of this type have channel, so only check it for them
-    #         if msg.type in ['note_on', 'note_off', 'control_change']:
-    #             # Only add note if channel is not 9
-    #             if msg.channel != 8:
-    #                 new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
-    #                 # Reset note time
-    #                 note_time = 0
-    #         else:
-    #             # Always add all messages of other types
-    #             new_track.append(msg.copy(type=msg.type, time=note_time))
-    #             # Reset note time
-    #             note_time=0
+    for msg in mergedtracks:
+        # Keep count of how much time has passed
+        note_time += msg.time
 
-    #     # MIDI files are multitrack. Here we append
-    #     # the new track with mapped notes to the output file
-    #     output_midi.tracks.append(new_track)
+        # if note_time < 
+
+        # Only notes of this type have channel, so only check it for them
+
+        # else:
+            # Always add all messages of other types
+            # new_track.append(msg.copy(type=msg.type, time=note_time))
+            # # Reset note time
+            # note_time=0
+
+    # MIDI files are multitrack. Here we append
+    # the new track with mapped notes to the output file
+    # output_midi.tracks.append(new_track)
 
     # output_midi.save(outputfile)
     # return [output_midi, outputfile]
@@ -318,7 +346,7 @@ if __name__ == '__main__':
     parser.add_argument("--action", default="rm-perc", type=str,
         choices=['rm-perc', 'rm-silence', 'split'])
     parser.add_argument("--split_time", default=40, type=int)
-    parser.add_argument("--clear_csl", default=True, type=bool)
+    parser.add_argument("--clear_csl", default=1, type=int)
     args = parser.parse_args()
     if args.parallel == 0:
         evaluate(args)
