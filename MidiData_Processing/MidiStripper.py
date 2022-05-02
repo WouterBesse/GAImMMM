@@ -60,7 +60,7 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.split_time, args.clr_csl, args.output_path, args.action)
+        result = tryremove(args.input_path, file, args.split_time, args.clear_csl, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
@@ -144,7 +144,7 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 raise ArgumentError("Invalid argument for --action:", action)
             print("Succeeded :D")
         except Exception as e:
-            print("Failed :( error:", e.message)
+            print("Failed :( error:", e)
             fail = 1
             pass
     if clear_csl == 1:
@@ -209,26 +209,30 @@ def remove_silence(inputpath, outputpath):
     # Copy time metrics between both files
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
 
-    first_time = 10000 # arbitrary for now; this will be the song's start time
+    # This property calculates the moment this song ends
+    song_length = ceil(input_midi.length)
+    # arbitrary for now; this will be the song's start time
+    first_time = 10000 
+    # These are the message types whose time property might not be 0
+    timed_types = {'note_on', 'note_off', 'marker', 'pitch_wheel', 'control_change'}
 
     # Find the timestamp for the first note_on message in all tracks
     # and the timestamp for the last note
     for original_track in input_midi.tracks:
+        # Check this track's messages until you find a note
         # Store the first note's timestamp in first_time
         for msg in original_track:
-            if msg.type == 'note_on':
+            if msg.type in timed_types:
                 msg_time = msg.time
                 if msg_time < first_time:
                     first_time = msg_time
                 break
         
-        # Mido can calculate end time; failsafe with final note_off message
+        # Mido can calculate end time; failsafe with final note_off message,
+        # but that's unnecessary.
         if original_track[-2].type == 'note_off':
             end_time = original_track[-2].time
             print('End time decided by note_off message:', end_time)
-        else:
-            end_time = ceil(input_midi.length)
-            print('End time decided by mido length property:', end_time)
 
     print('First start time for this file:', first_time)
 
@@ -237,11 +241,13 @@ def remove_silence(inputpath, outputpath):
         # Since time is stored relatively,
         # the song should now begin start_time ticks earlier
         for msg in original_track:
-            if msg.type == 'note_on':
+            if msg.type in timed_types:
                 msg.time -= first_time
                 if msg.time < 0:
                     msg.time = 0
                 break
+
+        end_time -= first_time
 
         # Make sure the song ends at end_time
         handled_msgs = 0
@@ -253,9 +259,10 @@ def remove_silence(inputpath, outputpath):
                 break
 
             # If this track seems to have no note_off messages,
-            # just make sure the last message is directly at the end time
+            # just make sure the last message (EOF) is actually at the end time
             elif msg.type == 'note_on' and handled_msgs > 3:
                 original_track[-1].time = end_time
+                break
             
             handled_msgs += 1    
 
