@@ -143,10 +143,12 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 split_midi(full_path, outputpath, split_time)
             elif action == "all":
                 nodrums = remove_drums(full_path, outputpath, 1)
+                # Return a full track as a list of midi messages
                 splitup = split_midi(full_path, outputpath, split_time, nodrums, 1)
 
                 curfile = 0
 
+                # Remove silence from the list of messages
                 for split in splitup:
                     splitnosilence = remove_silence(full_path, outputpath, split, 1)
                     outname = os.path.basename(full_path)
@@ -156,6 +158,7 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
             else:
                 raise ArgumentError("Invalid argument for --action:", action)
             print("Succeeded :D")
+            succeed = 1
         except Exception as e:
             print("Failed :( error:", e)
             fail = 1
@@ -163,8 +166,7 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
     if clear_csl == 1:
         clearConsole()
     print("Taken time: ", time.time() - st)
-    succeed = 1
-    return [fail, succeed]
+    return [succeed, fail]
 
 def remove_drums(inputpath, outputpath, isall = 0):
     # Get the name of the file and make a file place for it
@@ -340,7 +342,7 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
     note_time = 0
     time_elapsed = 0
 
-    for msg in mergedtracks:
+    for i, msg in enumerate(mergedtracks):
         # Keep count of how many ticks have passed
         note_time += msg.time
 
@@ -361,7 +363,7 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
             pass
         # If the time counter is above duration in seconds and the current message is not at the same time as the previous one (that would be nice to keep)
         if time_elapsed > duration*(10**6) and msg.time != 0:
-            print('Saving File')
+            print('Saving {0}\n   after {1} messages and {2} milliseconds'.format(inputpath, i, time_elapsed))
             # Create directory and save track
             filename = os.path.basename(inputpath)
             output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
@@ -375,9 +377,21 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
             new_track = MidiTrack()
             new_track.append(tempo_map[2][curtempo])
             new_track.append(msg.copy(time=0))
+        # Also save the song at the end of the file if it's at least 5 seconds
+        elif time_elapsed > 5000000 and i == len(mergedtracks) - 1:
+            print('Saving {0}\n   at EOF after {1} messages and {2} milliseconds'.format(inputpath, i, time_elapsed))
+            # Create directory and save track
+            filename = os.path.basename(inputpath)
+            output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
+            if isall == 0:
+                save_midi(new_track, output_dir, resolution)
+            else:
+                returnablemidis.append(save_midi(new_track, output_dir, resolution, 1))
         else:
+            # If you haven't reached the max duration yet, add this note to the track
             new_track.append(msg.copy())
     
+    # If we still need to remove silence, return all midi messages as a MidiFile()
     return returnablemidis
 
 
