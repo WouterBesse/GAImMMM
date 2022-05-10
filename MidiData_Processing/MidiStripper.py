@@ -60,7 +60,8 @@ def evaluate(args):
         print("Current file =", file)
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
-        result = tryremove(args.input_path, file, args.split_time, args.clear_csl, args.output_path, args.action)
+        resultaten = []
+        result = trymodify(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
@@ -99,7 +100,7 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(tryremove, [(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action) for file in listOfFiles]).get()
+    resultaten = pool.starmap_async(trymodify, [(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action) for file in listOfFiles]).get()
 
     # while c < len(listOfFiles):
     #     ts = time.time()
@@ -124,7 +125,7 @@ def evaluate_par(args):
 
     # for file in listOfFiles:
 # inputpath, filename, outputpath = "./newdataset/"
-def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = "./newdataset/", action = "rm-perc"):
+def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = "./newdataset/", action = "rm-perc"):
     st = time.time()
     
     fail = 0
@@ -140,6 +141,18 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 remove_silence(full_path, outputpath)
             elif action == "split":
                 split_midi(full_path, outputpath, split_time)
+            elif action == "all":
+                nodrums = remove_drums(full_path, outputpath, 1)
+                splitup = split_midi(full_path, outputpath, split_time, nodrums, 1)
+
+                curfile = 0
+
+                for split in splitup:
+                    splitnosilence = remove_silence(full_path, outputpath, split, 1)
+                    outname = os.path.basename(full_path)
+                    outputfile = os.path.join(outputpath, str(curfile) + "_" + outname)
+                    splitnosilence.save(outputfile)
+                    curfile += 1
             else:
                 raise ArgumentError("Invalid argument for --action:", action)
             print("Succeeded :D")
@@ -151,15 +164,17 @@ def tryremove(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
         clearConsole()
     print("Taken time: ", time.time() - st)
     succeed = 1
-    return (fail, succeed)
+    return [fail, succeed]
 
-def remove_drums(inputpath, outputpath):
+def remove_drums(inputpath, outputpath, isall = 0):
     # Get the name of the file and make a file place for it
     filename = os.path.basename(inputpath)
-    outputfile = os.path.join(outputpath, filename)
+    if isall == 0:       
+        outputfile = os.path.join(outputpath, filename)
 
     # Import wanted midi file
     input_midi = MidiFile(inputpath, clip=True)
+    
     # Create output midi file
     output_midi = MidiFile()
     # Copy time metrics between both files
@@ -180,7 +195,7 @@ def remove_drums(inputpath, outputpath):
             # Only notes of this type have channel, so only check it for them
             if msg.type in ['note_on', 'note_off', 'control_change']:
                 # Only add note if channel is not 9
-                if msg.channel != 8:
+                if msg.channel < 5:
                     new_track.append(msg.copy(type=msg.type, time=note_time, channel=2))
                     # Reset note time
                     note_time = 0
@@ -194,16 +209,18 @@ def remove_drums(inputpath, outputpath):
         # the new track with mapped notes to the output file
         output_midi.tracks.append(new_track)
 
-    output_midi.save(outputfile)
-    return [output_midi, outputfile]
+    if isall == 0:
+        output_midi.save(outputfile)
+    return output_midi
 
-def remove_silence(inputpath, outputpath):
+def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
     # Get the name of the file and make a file place for it
-    filename = os.path.basename(inputpath)
-    outputfile = os.path.join(outputpath, filename)
+    if isall == 0:
+        filename = os.path.basename(inputpath)
+        outputfile = os.path.join(outputpath, filename)
 
-    # Import wanted midi file
-    input_midi = MidiFile(inputpath, clip=True)
+        # Import wanted midi file
+        input_midi = MidiFile(inputpath, clip=True)
     # Create output midi file
     output_midi = MidiFile()
     # Copy time metrics between both files
@@ -211,6 +228,7 @@ def remove_silence(inputpath, outputpath):
 
     # This property calculates the moment this song ends
     song_length = ceil(input_midi.length)
+    end_time = song_length
     # arbitrary for now; this will be the song's start time
     first_time = 10000 
     # These are the message types whose time property might not be 0
@@ -247,7 +265,7 @@ def remove_silence(inputpath, outputpath):
                     msg.time = 0
                 break
 
-        end_time -= first_time
+        end_time = end_time - first_time
 
         # Make sure the song ends at end_time
         handled_msgs = 0
@@ -266,8 +284,9 @@ def remove_silence(inputpath, outputpath):
             
             handled_msgs += 1    
 
-    input_midi.save(outputfile)
-    return [output_midi, outputfile]
+    if isall == 0:
+        output_midi.save(outputfile)
+    return output_midi
 
 def get_tempos(input_track):
     tempo_map = [[],[],[]]
@@ -284,24 +303,30 @@ def get_tempos(input_track):
             tempo_map[1].append(msg.tempo)
             tempo_map[2].append(msg.copy(time=0))
     
-    return(tempo_map)
+    print("Tempo mapje", tempo_map)
+    return tempo_map
 
-def save_midi(curtrack, destination, resolution):
+def save_midi(curtrack, destination, resolution, isall = 0):
     output_midi = MidiFile()
     # Copy time metrics
     output_midi.ticks_per_beat = resolution
-    print(curtrack)
+    # print(curtrack)
     # Save track
     output_midi.tracks.append(curtrack)
-    output_midi.save(destination)
+    if isall == 0:
+        output_midi.save(destination)
+    else:
+        return output_midi
 
-def split_midi(inputpath, outputpath, duration):
+def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall = 0):
     curfile = 0
 
-    # Import midi file
-    input_midi = MidiFile(inputpath, clip=True) 
+    if isall == 0:
+        # Import midi file
+        input_midi = MidiFile(inputpath, clip=True) 
     
     new_track = MidiTrack()
+    returnablemidis = []
 
     mergedtracks = merge_tracks(input_midi.tracks)
 
@@ -309,6 +334,7 @@ def split_midi(inputpath, outputpath, duration):
     tempo_map = get_tempos(mergedtracks)
     resolution = input_midi.ticks_per_beat
 
+    print(tempo_map)
     time_per_tick = tempo_map[1][curtempo]/resolution
 
     note_time = 0
@@ -339,8 +365,10 @@ def split_midi(inputpath, outputpath, duration):
             # Create directory and save track
             filename = os.path.basename(inputpath)
             output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
-            save_midi(new_track, output_dir, resolution)
-
+            if isall == 0:
+                save_midi(new_track, output_dir, resolution)
+            else:
+                returnablemidis.append(save_midi(new_track, output_dir, resolution, 1))
             # Reset time counter and create new midi track
             time_elapsed = 0
             curfile += 1
@@ -350,12 +378,7 @@ def split_midi(inputpath, outputpath, duration):
         else:
             new_track.append(msg.copy())
     
-    print('Saving File')
-    # Create directory and save track
-    filename = os.path.basename(inputpath)
-    output_dir = os.path.join(outputpath, str(curfile) + "_" + filename)
-    # new_track.append(mergedtracks[-1].copy())
-    save_midi(new_track, output_dir, resolution)
+    return returnablemidis
 
 
 if __name__ == '__main__':
