@@ -143,12 +143,12 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 split_midi(full_path, outputpath, split_time)
             elif action == "all":
                 nodrums = remove_drums(full_path, outputpath, 1)
-                # Return a full track as a list of midi messages
+                # Return a full track as a list of x second midi files
                 splitup = split_midi(full_path, outputpath, split_time, nodrums, 1)
 
                 curfile = 0
 
-                # Remove silence from the list of messages
+                # Remove silence from the list of midi files
                 for split in splitup:
                     splitnosilence = remove_silence(full_path, outputpath, split, 1)
                     outname = os.path.basename(full_path)
@@ -229,15 +229,37 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
 
     # This property calculates the moment this song ends
-    song_length = ceil(input_midi.length)
-    end_time = song_length
+    # song_length = ceil(input_midi.length)
+    # end_time = song_length
+    # print("Midi length = ", end_time)
+
     # arbitrary for now; this will be the song's start time
     first_time = 10000 
     # These are the message types whose time property might not be 0
-    timed_types = {'note_on', 'note_off', 'marker', 'pitch_wheel', 'control_change'}
+    # timed_types = {'note_on', 'note_off', 'marker', 'pitch_wheel', 'control_change'}
+    timed_types = {'note_on', 'note_off'}
+    # print(input_midi)
 
     # Find the timestamp for the first note_on message in all tracks
     # and the timestamp for the last note
+    # for original_track in input_midi.tracks:
+    #     # Check this track's messages until you find a note
+    #     # Store the first note's timestamp in first_time
+    #     for msg in original_track:
+    #         if msg.type in timed_types:
+    #             msg_time = msg.time
+    #             if msg_time < first_time:
+    #                 first_time = msg_time
+    #             break
+        
+    #     # Mido can calculate end time; failsafe with final note_off message,
+    #     # but that's unnecessary.
+    #     if original_track[-2].type == 'note_off':
+    #         end_time = original_track[-2].time
+    #         print('End time decided by note_off message:', end_time)
+
+    print('First start time for this file:', first_time)
+
     for original_track in input_midi.tracks:
         # Check this track's messages until you find a note
         # Store the first note's timestamp in first_time
@@ -248,16 +270,8 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
                     first_time = msg_time
                 break
         
-        # Mido can calculate end time; failsafe with final note_off message,
-        # but that's unnecessary.
-        if original_track[-2].type == 'note_off':
-            end_time = original_track[-2].time
-            print('End time decided by note_off message:', end_time)
-
-    print('First start time for this file:', first_time)
-
-    for original_track in input_midi.tracks:
         # Subtract the start time from the first note
+        # Also make time 0 for all other misc notes that come before that
         # Since time is stored relatively,
         # the song should now begin start_time ticks earlier
         for msg in original_track:
@@ -266,29 +280,35 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
                 if msg.time < 0:
                     msg.time = 0
                 break
+            else:
+                msg.time = 0
+        
 
-        end_time = end_time - first_time
+        # end_time = end_time - first_time
 
         # Make sure the song ends at end_time
-        handled_msgs = 0
+        # handled_msgs = 0
         for msg in reversed(original_track):
             # The last note_off should be at end_time
-            if msg.type == 'note_off':
-                if msg.time > end_time:
-                    msg.time = end_time
-                break
+            if msg.type not in timed_types:
+                msg.time == 0;
+                # if msg.time > end_time:
+                #     msg.time = end_time
+                # break
+            # else:
+            #     msg.time == 0;
 
-            # If this track seems to have no note_off messages,
-            # just make sure the last message (EOF) is actually at the end time
-            elif msg.type == 'note_on' and handled_msgs > 3:
-                original_track[-1].time = end_time
-                break
+            # # If this track seems to have no note_off messages,
+            # # just make sure the last message (EOF) is actually at the end time
+            # elif msg.type == 'note_on' and handled_msgs > 3:
+            #     original_track[-1].time = end_time
+            #     break
             
-            handled_msgs += 1    
+            # handled_msgs += 1
 
     if isall == 0:
-        output_midi.save(outputfile)
-    return output_midi
+        input_midi.save(outputfile)
+    return input_midi
 
 def get_tempos(input_track):
     tempo_map = [[],[],[]]
@@ -312,7 +332,6 @@ def save_midi(curtrack, destination, resolution, isall = 0):
     output_midi = MidiFile()
     # Copy time metrics
     output_midi.ticks_per_beat = resolution
-    # print(curtrack)
     # Save track
     output_midi.tracks.append(curtrack)
     if isall == 0:
@@ -336,7 +355,6 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
     tempo_map = get_tempos(mergedtracks)
     resolution = input_midi.ticks_per_beat
 
-    print(tempo_map)
     time_per_tick = tempo_map[1][curtempo]/resolution
 
     note_time = 0
@@ -377,6 +395,7 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
             new_track = MidiTrack()
             new_track.append(tempo_map[2][curtempo])
             new_track.append(msg.copy(time=0))
+            print("New 40s track", new_track)
         # Also save the song at the end of the file if it's at least 5 seconds
         elif time_elapsed > 5000000 and i == len(mergedtracks) - 1:
             print('Saving {0}\n   at EOF after {1} messages and {2} milliseconds'.format(inputpath, i, time_elapsed))
