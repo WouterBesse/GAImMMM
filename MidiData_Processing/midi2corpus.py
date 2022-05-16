@@ -225,9 +225,9 @@ def proc_one(path_midi, path_outfile, emotion):
 
 if __name__ == '__main__':
      # paths
-    path_indir = './data/midi_analyzed'
-    path_outdir = './data/corpus/fixed'
-    path_emo_df = pd.read_csv("J:/Projects/2021-2022/EMOPIA_cls-main/nextdatabase5/FinalData.csv")
+    path_indir = 'J:/Projects/2021-2022/GAImMMM Data/Analyzed'
+    path_outdir = 'J:/Projects/2021-2022/GAImMMM Data/corpus/fixed'
+    path_emo_df = pd.read_csv("J:/Projects/2021-2022/GAImMMM Data/Category Data/analysisraw.csv")
     os.makedirs(path_outdir, exist_ok=True)
     catlist = path_emo_df['Category'].tolist()
     namelistpre = path_emo_df['Filename'].tolist()

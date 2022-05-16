@@ -123,8 +123,8 @@ def proc_one(path_infile, path_outfile):
 
 if __name__ == '__main__':
     # paths
-    path_indir = 'J:/Projects/2021-2022/GAImMMM Old/GAImMMM/NewMidiDataProcessed'
-    path_outdir = './data/midi_analyzed'
+    path_indir = 'J:/Projects/2021-2022/GAImMMM Old/GAImMMM/Midi Processing/testerdatset/processed'
+    path_outdir = 'C:/Users/woute/GAImMMM Data'
     os.makedirs(path_outdir, exist_ok=True)
 
     # list files

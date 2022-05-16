@@ -40,8 +40,8 @@ parser.add_argument("--exp_name", default='output' , type=str)
 parser.add_argument("--load_ckt", default="none", type=str)   #pre-train model
 parser.add_argument("--load_ckt_loss", default="25", type=str)     #pre-train model
 parser.add_argument("--path_train_data", default='emopia', type=str)  
-parser.add_argument("--data_root", default='/home/teun.buwalda/data/GAImMMM/Emopia_Fork/workspace/transformer/GAImMMM_Data', type=str) # <------- Deze map moet wijzen naar de co-representation folder op je server
-parser.add_argument("--load_dict", default="more_dictionary.pkl", type=str) # <------- Dit is de naam van je dictionary bestand. Good to note: Zorg ervoor dat je onze gebruikt, die moet je dan dus eerst ff in de co-representation map zetten
+parser.add_argument("--data_root", default='./GAImMMM_Data_2.0', type=str) # <------- Deze map moet wijzen naar de co-representation folder op je server
+parser.add_argument("--load_dict", default="dictionary.pkl", type=str) # <------- Dit is de naam van je dictionary bestand. Good to note: Zorg ervoor dat je onze gebruikt, die moet je dan dus eerst ff in de co-representation map zetten
 parser.add_argument("--init_lr", default= 0.00001, type=float)
 # inference config
 

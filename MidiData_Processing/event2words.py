@@ -83,10 +83,10 @@ def build_dict(path_root, path_indir, eventfiles, path_dict):
 
 if __name__ == '__main__':
     # paths
-    path_root = 'data/'
-    path_indir = os.path.join(path_root, './events')
-    path_outdir =  os.path.join(path_root, './words')
-    path_dict = os.path.join(path_root, './dictionary.pkl')
+    path_root = 'J:/Projects/2021-2022/GAImMMM Data/'
+    path_indir = os.path.join(path_root, 'J:/Projects/2021-2022/GAImMMM Data/events')
+    path_outdir =  os.path.join(path_root, 'J:/Projects/2021-2022/GAImMMM Data/words')
+    path_dict = os.path.join(path_root, 'J:/Projects/2021-2022/GAImMMM Data/dictionary.pkl')
     os.makedirs(path_outdir, exist_ok=True)
 
     # list files

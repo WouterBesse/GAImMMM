@@ -258,7 +258,6 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
     #         end_time = original_track[-2].time
     #         print('End time decided by note_off message:', end_time)
 
-    print('First start time for this file:', first_time)
 
     for original_track in input_midi.tracks:
         # Check this track's messages until you find a note
@@ -269,6 +268,7 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
                 if msg_time < first_time:
                     first_time = msg_time
                 break
+        print('First start time for this file:', first_time)
         
         # Subtract the start time from the first note
         # Also make time 0 for all other misc notes that come before that
@@ -325,7 +325,6 @@ def get_tempos(input_track):
             tempo_map[1].append(msg.tempo)
             tempo_map[2].append(msg.copy(time=0))
     
-    print("Tempo mapje", tempo_map)
     return tempo_map
 
 def save_midi(curtrack, destination, resolution, isall = 0):
@@ -395,7 +394,6 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
             new_track = MidiTrack()
             new_track.append(tempo_map[2][curtempo])
             new_track.append(msg.copy(time=0))
-            print("New 40s track", new_track)
         # Also save the song at the end of the file if it's at least 5 seconds
         elif time_elapsed > 5000000 and i == len(mergedtracks) - 1:
             print('Saving {0}\n   at EOF after {1} messages and {2} milliseconds'.format(inputpath, i, time_elapsed))

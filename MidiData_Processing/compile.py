@@ -15,7 +15,7 @@ TEST_AMOUNT = 50
 WINDOW_SIZE = 512
 GROUP_SIZE = 2    #7
 MAX_LEN = WINDOW_SIZE * GROUP_SIZE
-COMPILE_TARGET = 'XL' # 'linear', 'XL'
+COMPILE_TARGET = 'linear' # 'linear', 'XL'
 print('[config] MAX_LEN:', MAX_LEN)
 
 broken_list = [
@@ -72,7 +72,7 @@ def traverse_dir(
 
 if __name__ == '__main__':
     # paths
-    path_root = './data/'
+    path_root = 'J:/Projects/2021-2022/GAImMMM Data/'
     path_indir = os.path.join( path_root, 'words')
 
     # load all words

@@ -297,9 +297,9 @@ def corpus2event_cp(path_infile, path_outfile):
 
 if __name__ == '__main__':
     # paths
-    path_root = './data'
-    path_indir = 'J:/Projects/2021-2022/GAImMMM/GAImMMM/Midi Processing/data/corpus/fixed'
-    path_outdir = './data/events'
+    path_root = 'J:/Projects/2021-2022/GAImMMM Data/'
+    path_indir = 'J:/Projects/2021-2022/GAImMMM Data/corpus/fixed'
+    path_outdir = 'J:/Projects/2021-2022/GAImMMM Data/events'
     os.makedirs(path_outdir, exist_ok=True)
 
     # list files
@@ -319,7 +319,7 @@ if __name__ == '__main__':
         print('{}/{}'.format(fidx+1, n_files))
 
         # paths
-        path_infile = os.path.join("J:/Projects/2021-2022/GAImMMM/GAImMMM/Midi Processing/data/corpus/fixed", path_midi[1:])
+        path_infile = os.path.join("J:/Projects/2021-2022/GAImMMM Data/corpus/fixed", path_midi[1:])
         path_outfile = os.path.join(path_outdir, path_midi[1:])
 
         print(path_indir, ' path_indir')
