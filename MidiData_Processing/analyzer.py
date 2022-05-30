@@ -67,64 +67,64 @@ def traverse_dir(
 
 
 def proc_one(path_infile, path_outfile):
-    try:
-        print('----')
-        print(' >', path_infile)
-        print(' >', path_outfile)
+    # try:
+    print('----')
+    print(' >', path_infile)
+    print(' >', path_outfile)
 
-        # load
-        midi_obj = miditoolkit.midi.parser.MidiFile(path_infile)
-        midi_obj_out = copy.deepcopy(midi_obj)
-        notes = midi_obj.instruments[0].notes
-        notes = sorted(notes, key=lambda x: (x.start, x.pitch))
+    # load
+    midi_obj = miditoolkit.midi.parser.MidiFile(path_infile)
+    midi_obj_out = copy.deepcopy(midi_obj)
+    notes = midi_obj.instruments[0].notes
+    notes = sorted(notes, key=lambda x: (x.start, x.pitch))
 
-        # --- chord --- #
-        # exctract chord
-        chords = Dechorder.dechord(midi_obj)
-        markers = []
-        for cidx, chord in enumerate(chords):
-            if chord.is_complete():
-                chord_text = num2pitch[chord.root_pc] + '_' + chord.quality + '_' + num2pitch[chord.bass_pc]
-            else:
-                chord_text = 'N_N_N'
-            markers.append(Marker(time=int(cidx*480), text=chord_text))
+    # --- chord --- #
+    # exctract chord
+    chords = Dechorder.dechord(midi_obj)
+    markers = []
+    for cidx, chord in enumerate(chords):
+        if chord.is_complete():
+            chord_text = num2pitch[chord.root_pc] + '_' + chord.quality + '_' + num2pitch[chord.bass_pc]
+        else:
+            chord_text = 'N_N_N'
+        markers.append(Marker(time=int(cidx*480), text=chord_text))
 
-        # dedup
-        prev_chord = None
-        dedup_chords = []
-        for m in markers:
-            if m.text != prev_chord:
-                prev_chord = m.text
-                dedup_chords.append(m)
+    # dedup
+    prev_chord = None
+    dedup_chords = []
+    for m in markers:
+        if m.text != prev_chord:
+            prev_chord = m.text
+            dedup_chords.append(m)
 
-        # --- global properties --- #
-        # global tempo
-        tempos = [b.tempo for b in midi_obj.tempo_changes][:40]
-        tempo_median = np.median(tempos)
-        global_bpm =int(tempo_median)
-        print(' > [global] bpm:', global_bpm)
-    
-        # === save === #
-        # mkdir
-        fn = os.path.basename(path_outfile)
-        os.makedirs(path_outfile[:-len(fn)], exist_ok=True)
+    # --- global properties --- #
+    # global tempo
+    tempos = [b.tempo for b in midi_obj.tempo_changes][:40]
+    tempo_median = np.median(tempos)
+    global_bpm =int(tempo_median)
+    print(' > [global] bpm:', global_bpm)
 
-        # markers
-        midi_obj_out.markers = dedup_chords
-        midi_obj_out.markers.insert(0, Marker(text='global_bpm_'+str(int(global_bpm)), time=0))
+    # === save === #
+    # mkdir
+    fn = os.path.basename(path_outfile)
+    os.makedirs(path_outfile[:-len(fn)], exist_ok=True)
 
-        # save
-        midi_obj_out.instruments[0].name = 'piano'
-        midi_obj_out.dump(path_outfile)
-    except:
-        print(path_infile, " Failed :()")
-        pass
+    # markers
+    midi_obj_out.markers = dedup_chords
+    midi_obj_out.markers.insert(0, Marker(text='global_bpm_'+str(int(global_bpm)), time=0))
+
+    # save
+    midi_obj_out.instruments[0].name = 'piano'
+    midi_obj_out.dump(path_outfile)
+    # except:
+    #     print(path_infile, " Failed :()")
+    #     pass
 
 
 if __name__ == '__main__':
     # paths
-    path_indir = 'J:/Projects/2021-2022/GAImMMM Old/GAImMMM/Midi Processing/testerdatset/processed'
-    path_outdir = 'C:/Users/woute/GAImMMM Data'
+    path_indir = 'H:/Projects/2021-2022/GAImMMM Old/GAImMMM/Midi Processing/newtester/Processed'
+    path_outdir = "H:/Projects/2021-2022/GAImMMM Old/GAImMMM/Midi Processing/newtester/Processed/analyzed"
     os.makedirs(path_outdir, exist_ok=True)
 
     # list files

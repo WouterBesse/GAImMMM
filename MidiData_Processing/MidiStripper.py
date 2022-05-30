@@ -141,6 +141,8 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
                 remove_silence(full_path, outputpath)
             elif action == "split":
                 split_midi(full_path, outputpath, split_time)
+            elif action == "res":
+                change_resolution(full_path, outputpath, 480)
             elif action == "all":
                 nodrums = remove_drums(full_path, outputpath, 1)
                 # Return a full track as a list of x second midi files
@@ -411,6 +413,36 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
     # If we still need to remove silence, return all midi messages as a MidiFile()
     return returnablemidis
 
+def change_resolution(inputpath, outputpath, new_resolution,):
+    filename = os.path.basename(inputpath)
+    # Import midi file
+    input_midi = MidiFile(inputpath, clip=True) 
+    
+    
+    new_track = MidiTrack()
+
+    old_resolution = input_midi.ticks_per_beat
+    time_multiplier = new_resolution / old_resolution
+
+    outputfile = os.path.join(outputpath, filename)
+    output_midi = MidiFile()
+    output_midi.ticks_per_beat = new_resolution
+
+    for track in input_midi.tracks:
+        new_track = MidiTrack()
+        for msg in track:
+            new_track.append(msg.copy(time=int(msg.time * time_multiplier)))
+        output_midi.tracks.append(new_track)
+
+    output_midi.save(outputfile)
+    print(output_midi)
+    return output_midi
+
+        
+    
+    # If we still need to remove silence, return all midi messages as a MidiFile()
+    return returnablemidis
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -418,7 +450,7 @@ if __name__ == '__main__':
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
     parser.add_argument("--action", default="rm-perc", type=str,
-        choices=['rm-perc', 'rm-silence', 'split', 'all'])
+        choices=['rm-perc', 'rm-silence', 'split', 'res', 'all'])
     parser.add_argument("--channel_limit", default=4, type=int)
     parser.add_argument("--split_time", default=40, type=int) # In seconds
     parser.add_argument("--clear_csl", default=1, type=int)
