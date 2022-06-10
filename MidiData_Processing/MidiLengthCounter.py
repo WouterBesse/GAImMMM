@@ -21,9 +21,6 @@ parser.add_argument("--output_dir", default="./", type=str)
 parser.add_argument("--namelist", default="J:/Projects/2021-2022/GAImMMM Data/corpus/fixed", type=str)
 args = parser.parse_args()
 
-
-
-
 # clearConsole script acquired from https://www.delftstack.com/howto/python/python-clear-console/
 def clearConsole():
     command = 'clear'

@@ -1,4 +1,6 @@
 
+The central code that we wrote for GAImMMM is within `MidiStripper.py`. The following is the readme from EMOPIA for creating your own dataset:
+
 # Dataset processing
 
 ## If you want to use the processed data used in our paper...
