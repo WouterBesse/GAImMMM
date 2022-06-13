@@ -1,0 +1,8 @@
+﻿*.mid
+Emopia_Fork/workspace/transformer/exp/fine-tune_01/gen_midis
+Emopia_Fork/workspace/transformer/exp/fine-tune_02/gen_midis/loss_20
+Emopia_Fork/workspace/transformer/exp
+Emopia_Fork/workspace/transformer/GAImMMM_Data_2.1
+Emopia_Fork/workspace/transformer/runtime_stats.json
+MidiData_Processing/.vs/MidiData_Processing/v16
+MidiData_Processing/.vs
