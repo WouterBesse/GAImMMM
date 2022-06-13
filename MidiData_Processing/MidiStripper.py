@@ -14,6 +14,9 @@ failed = 0
 
 # clearConsole script acquired from https://www.delftstack.com/howto/python/python-clear-console/
 def clearConsole():
+    """
+    Remove all text from the console.
+    """
     command = 'clear'
     if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
         command = 'cls'
@@ -21,7 +24,12 @@ def clearConsole():
 
 # getListOfFiles script acquired from https://thispointer.com/python-how-to-get-list-of-files-in-directory-and-sub-directories/
 def getListOfFiles(dirName):
-    # create a list of file and sub directories
+    """
+    Create a list of file and sub directories
+
+    :param dirName: str: subdirectory to scan files of
+    :return: list of full path for each file and directory within dirName
+    """
     # names in the given directory
     listOfFile = os.listdir(dirName)
     allFiles = list()
@@ -38,6 +46,15 @@ def getListOfFiles(dirName):
     return allFiles
 
 def evaluate(args):
+    """
+    Carry out the given action (remove percussion; remove silence; split into
+    clips; change beat resolution; all of these) on every file in the given
+    input path.
+    Works on one CPU only; called when --parallel is set to 0
+
+    :param args: The command-line arguments
+    """
+
     # counting variable
     global succeeded
     global failed
@@ -61,7 +78,8 @@ def evaluate(args):
         print("Files succeeded =", succeeded)
         print("Files failed =", failed)
         resultaten = []
-        result = trymodify(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action)
+        result = trymodify(args.input_path, file, len(resultaten), 
+            args.split_time, args.clear_csl, args.output_path, args.action)
         succeeded += result[0]
         failed += result[1]
         resultaten.append(result)
@@ -78,6 +96,15 @@ def evaluate(args):
     print("Done <3")
 
 def evaluate_par(args):
+    """
+    Carry out the given action (remove percussion; remove silence; split into
+    clips; change beat resolution; all of these) on every file in the given
+    input path.
+    Works on any number of CPUs; called when --parallel is set to 1.
+
+    :param args: The command-line arguments
+    """
+
     # counting variable
     global succeeded
     global failed
@@ -100,32 +127,36 @@ def evaluate_par(args):
     c = 0
     resultaten = []
     tt = 0
-    resultaten = pool.starmap_async(trymodify, [(args.input_path, file, len(resultaten), args.split_time, args.clear_csl, args.output_path, args.action) for file in listOfFiles]).get()
+    resultaten = pool.starmap_async(trymodify,
+        [
+            (args.input_path, file, len(resultaten), args.split_time, 
+            args.clear_csl, args.output_path, args.action) 
+            for file in listOfFiles
+        ]
+        ).get()
 
-    # while c < len(listOfFiles):
-    #     ts = time.time()
-    #     n = 0
-    #     result = []
-        
-    #     print("Current file =", listOfFiles[c])
-    #     print("Files succeeded =", succeeded)
-    #     print("Files failed =", failed)
-        
-    #     n += 1
-    #     c += 1
-    #     succeeded += result[0]
-    #     failed += result[1]
-    #     resultaten.append(result)
-    #     clearConsole()
-    #     print("Time in parallel for 16: ", tt)
-    #     tt = time.time()-ts
     pool.close
     pool.join
     print("Done <3")
 
-    # for file in listOfFiles:
-# inputpath, filename, outputpath = "./newdataset/"
-def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = "./newdataset/", action = "rm-perc"):
+def trymodify(inputpath, filename, succeed, split_time, clear_csl, 
+              outputpath = "./newdataset/", action = "rm-perc"):
+    """
+    Carry out the given action on a file and save it.
+
+    :param inputpath: str: full path to the directory holding filename
+    :param filename: str: name of the file to process
+    :param succeed: int: number of files successfully converted so far
+    :param split_time: int: maximum playback time of a split clip in seconds
+    :clear_csl: 0 or 1: whether of not to clear the console after each file
+    :outputpath: str: where to save the processed files
+    :action: str: given argument saying which action to perform (remove 
+        percussion; remove silence; split into clips; change beat resolution; 
+        all of these)
+
+    :return: a list with length 2 containing the new number of succeeded files
+        and the number of failed files, respectively
+    """
     st = time.time()
     
     fail = 0
@@ -171,6 +202,18 @@ def trymodify(inputpath, filename, succeed, split_time, clear_csl, outputpath = 
     return [succeed, fail]
 
 def remove_drums(inputpath, outputpath, isall = 0):
+    """
+    Remove the percussion track and some other unnecessary tracks from this file
+    and save it somewhere else.
+
+    :param inputpath: str: full path to the file to process
+    :param outputpath: str: relative path where to save the processed file
+    :param isall: 0 or 1: whether the action that's being performed is to do
+        all the actions; this fact influences the way this file should be saved
+
+    :return: mido.MidiFile: the output midi file after processing
+    """
+
     # Get the name of the file and make a file place for it
     filename = os.path.basename(inputpath)
     if isall == 0:       
@@ -218,6 +261,18 @@ def remove_drums(inputpath, outputpath, isall = 0):
     return output_midi
 
 def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
+    """
+    Remove a few seconds of silence from the beginning of a midi file
+    and save it somewhere else.
+
+    :param inputpath: str: full path to the file to process
+    :param outputpath: str: relative path where to save the processed file
+    :param input_midi: mido.MidiFile: midi object for the file to process
+    :param isall: 0 or 1: whether the action that's being performed is to do
+        all the actions; this fact influences the way this file should be saved
+
+    :return: mido.MidiFile: the output midi file after processing
+    """
     # Get the name of the file and make a file place for it
     if isall == 0:
         filename = os.path.basename(inputpath)
@@ -230,36 +285,10 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
     # Copy time metrics between both files
     output_midi.ticks_per_beat = input_midi.ticks_per_beat
 
-    # This property calculates the moment this song ends
-    # song_length = ceil(input_midi.length)
-    # end_time = song_length
-    # print("Midi length = ", end_time)
-
     # arbitrary for now; this will be the song's start time
     first_time = 10000 
-    # These are the message types whose time property might not be 0
-    # timed_types = {'note_on', 'note_off', 'marker', 'pitch_wheel', 'control_change'}
+    # These are the message types whose time property we might want to change
     timed_types = {'note_on', 'note_off'}
-    # print(input_midi)
-
-    # Find the timestamp for the first note_on message in all tracks
-    # and the timestamp for the last note
-    # for original_track in input_midi.tracks:
-    #     # Check this track's messages until you find a note
-    #     # Store the first note's timestamp in first_time
-    #     for msg in original_track:
-    #         if msg.type in timed_types:
-    #             msg_time = msg.time
-    #             if msg_time < first_time:
-    #                 first_time = msg_time
-    #             break
-        
-    #     # Mido can calculate end time; failsafe with final note_off message,
-    #     # but that's unnecessary.
-    #     if original_track[-2].type == 'note_off':
-    #         end_time = original_track[-2].time
-    #         print('End time decided by note_off message:', end_time)
-
 
     for original_track in input_midi.tracks:
         # Check this track's messages until you find a note
@@ -284,35 +313,28 @@ def remove_silence(inputpath, outputpath, input_midi = MidiFile(), isall = 0):
                 break
             else:
                 msg.time = 0
-        
-
-        # end_time = end_time - first_time
 
         # Make sure the song ends at end_time
-        # handled_msgs = 0
         for msg in reversed(original_track):
             # The last note_off should be at end_time
             if msg.type not in timed_types:
                 msg.time == 0;
-                # if msg.time > end_time:
-                #     msg.time = end_time
-                # break
-            # else:
-            #     msg.time == 0;
-
-            # # If this track seems to have no note_off messages,
-            # # just make sure the last message (EOF) is actually at the end time
-            # elif msg.type == 'note_on' and handled_msgs > 3:
-            #     original_track[-1].time = end_time
-            #     break
-            
-            # handled_msgs += 1
 
     if isall == 0:
         input_midi.save(outputfile)
     return input_midi
 
 def get_tempos(input_track):
+    """
+    Create a map of all tempo changes that occur within a given MIDI track.
+
+    :param input_track: mido.MidiTrack: the track to analyze
+
+    :return: list containing 3 lists, whose indices connect to each other:
+        * the time the tempo change occurs at
+        * the new tempo
+        * the message that this tempo change occurs at, with time set to 0
+    """
     tempo_map = [[],[],[]]
     note_time = 0
 
@@ -322,7 +344,9 @@ def get_tempos(input_track):
         note_time += msg.time
 
         if msg.type == 'set_tempo':
-            # Making a vector with two other vectors, vector 1 = on which tick a new tempo is set, vector 2 = what that tempo is
+            # Making a vector with two other vectors, 
+            # vector 1 = on which tick a new tempo is set, 
+            # vector 2 = what that tempo is
             tempo_map[0].append(note_time)
             tempo_map[1].append(msg.tempo)
             tempo_map[2].append(msg.copy(time=0))
@@ -330,6 +354,17 @@ def get_tempos(input_track):
     return tempo_map
 
 def save_midi(curtrack, destination, resolution, isall = 0):
+    """
+    Save a MidiTrack as a midi file.
+
+    :param curtrack: mido.MidiTrack: the track to be saved
+    :param destination: str: path to save the file to
+    :param resolution: int: ticks per beat for the new midi file
+    :param isall: 0 or 1: whether the action that's being performed is to do
+        all the actions; this fact influences the way this file should be saved
+
+    :return: if isall is set to 1, return a MidiFile object instead of saving it
+    """
     output_midi = MidiFile()
     # Copy time metrics
     output_midi.ticks_per_beat = resolution
@@ -341,6 +376,22 @@ def save_midi(curtrack, destination, resolution, isall = 0):
         return output_midi
 
 def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall = 0):
+    """
+    Split a midi file into clips with a max playback time
+    and save them somewhere else.
+
+    :param inputpath: str: full path to the file to process
+        (used when isall == 0)
+    :param outputpath: str: relative path where to save the processed file
+    :param duration: int: maximum playback time of a split clip in seconds
+    :param input_midi: mido.MidiFile: midi object for the file to process
+        (used when isall == 1)
+    :param isall: 0 or 1: whether the action that's being performed is to do
+        all the actions; this fact influences the way this file should be saved
+
+    :return: [mido.MidiFile]: list of midi files, one for each clip. This is
+        necessary if we still need to remove silence.
+    """
     curfile = 0
 
     if isall == 0:
@@ -365,7 +416,9 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
         # Keep count of how many ticks have passed
         note_time += msg.time
 
-        # If we passed a tempo change, add the time elapsed before the change and after the change to the time_elapsed and count that we are on a new tempo index
+        # If we passed a tempo change, add the time elapsed before the change 
+        # and after the change to the time_elapsed and count that we are on a 
+        # new tempo index
         try:
             if note_time >= tempo_map[0][curtempo + 1]:
                 curtempo += 1
@@ -413,7 +466,17 @@ def split_midi(inputpath, outputpath, duration, input_midi = MidiFile(), isall =
     # If we still need to remove silence, return all midi messages as a MidiFile()
     return returnablemidis
 
-def change_resolution(inputpath, outputpath, new_resolution,):
+def change_resolution(inputpath, outputpath, new_resolution):
+    """
+    Change a midi file's "ticks per beat" resolution
+    and save it somewhere else.
+
+    :param inputpath: str: full path to the file to process
+    :param outputpath: str: relative path where to save the processed file
+    :param new_resolution: int: new resolution in ticks per beat
+
+    :return: mido.MidiFile: the output midi file after processing
+    """
     filename = os.path.basename(inputpath)
     # Import midi file
     input_midi = MidiFile(inputpath, clip=True) 
@@ -438,22 +501,23 @@ def change_resolution(inputpath, outputpath, new_resolution,):
     print(output_midi)
     return output_midi
 
-        
-    
-    # If we still need to remove silence, return all midi messages as a MidiFile()
-    return returnablemidis
-
-
 if __name__ == '__main__':
-    parser = ArgumentParser()
+    args_description = """--input_path: folder of midi files to process
+--output_path: where to save the new midi files
+--parallel: either 0 or 1; whether to use multiple CPUs
+--action: remove percussion; remove silence; split into clips; change beat resolution or all of these
+--split_time: maximum playback time for the new midi clips after splitting in seconds; default is 40 seconds
+--clear_csl: either 0 or 1; whether to clear the console after each processed file"""
+    parser = ArgumentParser(description = args_description)
+
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", default="./newdataset/", type=str)
     parser.add_argument("--parallel", default=1, type=int)
     parser.add_argument("--action", default="rm-perc", type=str,
         choices=['rm-perc', 'rm-silence', 'split', 'res', 'all'])
-    parser.add_argument("--channel_limit", default=4, type=int)
     parser.add_argument("--split_time", default=40, type=int) # In seconds
     parser.add_argument("--clear_csl", default=1, type=int)
+
     args = parser.parse_args()
     if args.parallel == 0:
         evaluate(args)
